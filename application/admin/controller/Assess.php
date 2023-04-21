@@ -75,9 +75,8 @@ class Assess extends Base
         $b = $a * $pageSize;
         
         $whr['id'] = $this->admin_id;
-        $gid = Db::name('users')->where($whr)->value('group_id');
         $ruless = Db::name('users')->where($whr)->value('ruless');
-        if($gid == 1 || $gid == 2 || $gid == 7){
+        if($this->admin_id == 1){
             if(!empty($catid)){
                 $whra[]=['catid', '=', $catid];
                 $uuid= Db::name('cateuser')->field('uid')->where($whra)->buildSql(true);
@@ -112,8 +111,9 @@ class Assess extends Base
                     ->order('a.qid desc,a.update_time desc')
                     ->select();
                 }else{
-                    $rs_arr['status'] = 201;
+                    $rs_arr['status'] = 200;
                     $rs_arr['msg'] = '无权限';
+                    $rs_arr['data'] = array();
                     return json_encode($rs_arr,true);
                     exit;
                 }
@@ -132,25 +132,7 @@ class Assess extends Base
         }
         
         foreach ($list as $key => $val){
-            if($val['otherid'] != 1){
-                $whraa['uid'] = $val['otherid'];
-                $whraa['leixing'] = 1;
-                $clist = Db::name('cateuser')
-                ->where($whraa)
-                ->select();
-                foreach ($clist as $keys => $vals){
-                    $group_name = self::select_name($vals['catid']);
-                    $arr = explode('/',$group_name);
-                    $arrs = array_reverse($arr);
-                    $group_list = ltrim(implode('/',$arrs),'/');
-                    //$group_list = ltrim($group_list,'/');
-                    $clist[$keys]['group_name'] = $group_list;
-                } 
-            }else{
-                $clist = array();
-            }
             
-            $list[$key]['clist'] = $clist;
             $answers = json_decode($val['answer'],true);
             $list[$key]['answers'] = $answers;
             $list[$key]['one'] = $answers[0]['assess_score'];
@@ -175,8 +157,28 @@ class Assess extends Base
         }
         
         $data_rt['total'] = count($list);
-        $list = array_slice($list,$b,$pageSize);
-        $data_rt['data'] = $list;
+        $lists = array_slice($list,$b,$pageSize);
+        foreach($lists as $key => $val){
+            if($val['otherid'] != 1){
+                $whraa['uid'] = $val['otherid'];
+                $whraa['leixing'] = 1;
+                $clist = Db::name('cateuser')
+                ->where($whraa)
+                ->select();
+                foreach ($clist as $keys => $vals){
+                    $group_name = self::select_name($vals['catid']);
+                    $arr = explode('/',$group_name);
+                    $arrs = array_reverse($arr);
+                    $group_list = ltrim(implode('/',$arrs),'/');
+                    $clist[$keys]['group_name'] = $group_list;
+                } 
+            }else{
+                $clist = array();
+            }
+            
+            $lists[$key]['clist'] = $clist;
+        }
+        $data_rt['data'] = $lists;
 
         $rs_arr['status'] = 200;
         $rs_arr['msg'] = 'success';

@@ -583,6 +583,68 @@ function saiyouSms($phone,$code){
     
 }
 
+
+function saiyounotice($phone,$content){
+   
+    /*****************
+     * 加密请求 示例代码
+     ******************/
+    //appid参数 appkey参数在     短信-创建/管理AppID中获取
+    //手机号支持单个
+    //短信内容：签名+正文    详细规则查看短信-模板管理
+    $appid = '77300';                                                               //appid参数
+    $appkey = '12afc9d405aad2c5c3ebff37adab66e7';                                   //appkey参数
+    $to = $phone;                                                            //收信人 手机号码
+    $content = '【CorDx说】'.$content;
+    
+    //通过接口获取时间戳
+    $ch = curl_init();
+    curl_setopt_array($ch, array(
+        CURLOPT_URL            => 'https://api-v4.mysubmail.com/service/timestamp.json',
+        CURLOPT_RETURNTRANSFER => 1,
+        CURLOPT_POST           => 0,
+    ));
+    $output = curl_exec($ch);
+    curl_close($ch);
+    $output = json_decode($output, true);
+    $timestamp = $output['timestamp'];
+
+    $post_data = array(
+        "appid"         => $appid,
+        "to"            => $to,
+        "timestamp"     => $timestamp,
+        "sign_type"     => 'md5',
+        "sign_version"  => 2,
+        "content"       => $content,
+    );
+    //整理生成签名所需参数
+    $temp = $post_data;
+    unset($temp['content']);
+    ksort($temp);
+    reset($temp);
+    $tempStr = "";
+    foreach ($temp as $key => $value) {
+        $tempStr .= $key . "=" . $value . "&";
+    }
+    $tempStr = substr($tempStr, 0, -1);
+    //生成签名
+    $post_data['signature'] = md5($appid . $appkey . $tempStr . $appid . $appkey);
+
+    $ch = curl_init();
+    curl_setopt_array($ch, array(
+        CURLOPT_URL            => 'https://api-v4.mysubmail.com/sms/send.json',
+        CURLOPT_RETURNTRANSFER => 1,
+        CURLOPT_POST           => 1,
+        CURLOPT_POSTFIELDS     => $post_data,
+    ));
+    $output = curl_exec($ch);
+    curl_close($ch);
+
+    return $output;
+    
+}
+
+
 /**
  * YzxSms 云之讯短信
  * @param $param 验证码
@@ -681,9 +743,13 @@ function apireturn($code,$msg,$data=''){
     $data_rt['msg'] = $msg;
     if(!empty($data)){
         $data_rt['data'] = $data;
+    }else{
+        $data_rt['data'] = array();
     }
     return json_encode($data_rt,TRUE);
 }
+
+
 
 //更新站点统计数据
 //qid 大学堂id
@@ -814,3 +880,883 @@ function seacharr_by_value($array, $index, $value){
 }
 
 
+
+
+// 图片压缩
+/**
+ * common.php
+ * $url:图片路径
+ * $size_number:图片需要的大小，kb为单位
+ * $size_thumb:图片需要的宽度
+ */
+function image_zip($url,$size_number,$size_thumb)
+{
+	$size = filesize($url);        
+	if(($size/1000)>$size_number){
+		$image = \think\Image::open($url);
+		$image->thumb($size_thumb, $size_thumb)->save($url);
+	}
+}
+
+
+//查分类
+function sellist($ids,$val){
+    if($val != ''){
+        
+        $cs = explode('_',$val);
+        
+        $csids = explode('||',$cs[1]);
+        
+        $items = '';
+        foreach($csids as $vals){
+            $items .= $vals.',';
+        }
+        $whraa = [];
+        $whraa[] = ['spec_id','=',$cs[0]];
+        $whraa[] = ['result','in',$items];
+        if($ids){
+            $whraa[] = ['product_id','in',$ids];
+        }
+        
+        $ids = Db::name('product_relation')->field('product_id')->where($whraa)->select();
+        return $ids;
+    }else{
+        return $ids;
+    }
+
+}
+
+//资质操作记录
+function aptitudelog($type_id,$zzid,$aptitude_type,$aptitude_content,$aptitude_uid){
+    
+    if($type_id == 1){
+        $where['id'] = $zzid;
+        $info = Db::name('register_credential')
+            ->field('bianhao,name')
+            ->where($where)
+            ->find();
+        $data['aptitude_bianhao'] = $info['bianhao'];
+        $data['aptitude_name'] = $info['name'];
+    }elseif($type_id == 2){
+        $where['id'] = $zzid;
+        $info = Db::name('brand')
+            ->field('bianhao,name')
+            ->where($where)
+            ->find();
+        $data['aptitude_bianhao'] = $info['bianhao'];
+        $data['aptitude_name'] = $info['name'];
+    }else{
+        $where['id'] = $zzid;
+        $info = Db::name('other')
+            ->field('title,name')
+            ->where($where)
+            ->find();
+        $data['aptitude_bianhao'] = $info['title'];
+        $data['aptitude_name'] = $info['name'];
+    }
+    $data['type_id'] = $type_id;
+    $data['zzid'] = $zzid;
+    $data['aptitude_type'] = $aptitude_type;
+    $data['aptitude_content'] = $aptitude_content;
+    $data['aptitude_uid'] = $aptitude_uid;
+    $data['aptitude_time'] = time();
+    Db::name('aptitude_update')->insert($data);
+    
+}
+
+
+//获取是否在考勤范围
+
+function is_distance($lat,$lng,$uid){
+    
+    $data = Request::param();
+    
+    $today=strtotime(date('Y-m-d 00:00:00'));
+    
+    $map = [];
+    $map[] = ['uid','=',$uid];
+    $map[] = ['sub_time','>=',$today];
+   
+    $check_log = Db::name('check_log')->where($map)->order('sub_time asc')->select();
+    
+    $list = Db::name('location')->order('id asc')->select();
+     
+    $title = '';
+    $address = '';
+    $is_distance = 0;
+    foreach($list as $key => $val){
+         
+        //获取实际距离
+        $jl = getDistance($lat,$lng,$val['lat'],$val['lng'],$len_type = 1,$decimal = 2);
+      
+        if($jl <= $val['distance']){
+            $title = $val['title'];
+            $address = $val['address'];
+            $is_distance++;
+            $juli = $jl;
+        }
+    }
+    
+    $a['is_distance'] = $is_distance;
+    $a['title'] = $title;
+    $a['address'] = $address;
+    
+    return $a;
+     
+ }
+
+
+//$startTime 当前时间 
+//$min 变化分钟数
+//$type + -
+function strto_time($startTime,$min,$type){
+    //echo date("H:i", strtotime("$startTime +30 min")); 
+    
+    return date("H:i", strtotime($startTime.$type.$min."min"));
+}
+
+function apireturns($code,$num,$msg,$data=''){
+    $data_rt['status'] = $code;
+    $data_rt['num'] = $num;
+    $data_rt['msg'] = $msg;
+    if(!empty($data)){
+        $data_rt['data'] = $data;
+    }
+    return json_encode($data_rt,TRUE);
+}
+
+ /* 计算两组经纬度坐标之间的距离
+ * @param $lat1 纬度1
+ * @param $lng1 经度1
+ * @param $lat2 纬度2
+ * @param $lng2 经度2
+ * @param int $len_type 返回值类型(1-m 2-km)
+ * @param int $decimal 保留小数位数
+ * @return float
+ */
+ function getDistance($lat1, $lng1, $lat2, $lng2, $len_type = 1, $decimal = 2)
+ {
+   $radLat1 = $lat1 * 3.1415926 / 180.0;
+   $radLat2 = $lat2 * 3.1415926 / 180.0;
+   $a = $radLat1 - $radLat2;
+   $b = ($lng1 * 3.1415926 / 180.0) - ($lng2 * 3.1415926 / 180.0);
+   $s = 2 * asin(sqrt(pow(sin($a / 2), 2) + cos($radLat1) * cos($radLat2) * pow(sin($b / 2), 2)));
+   $s = $s * 6378.137;
+   $s = round($s * 1000);
+   if ($len_type > 1) {
+     $s /= 1000;
+   }
+   return round($s, $decimal);
+ }
+ 
+ /* 更新每日统计单人打卡记录
+ * @param $uid 用户id
+ * @param $attendance_group_id 考勤组id
+ * @param $classesid 班次id
+ * @param $day 日期
+ * @param int $status 打卡状态 1正常2迟到3早退
+ * @return float
+ */ 
+function update_check($uid,$attendance_group_id,$classesid,$day,$status){
+    
+    
+    $map = [];
+    $map[] = ['uid','=',$uid];
+    $map[] = ['attendance_group_id','=',$attendance_group_id];
+    $map[] = ['classesid','=',$classesid];
+    $map[] = ['day','=',$day];
+    $info = Db::name('check_count')->where($map)->find();
+    if($info){
+        //更新
+        if($status == 1){
+            $data['zcnum'] = $info['zcnum']+1;
+        }else if($status == 2){
+            $data['cdnum'] = $info['cdnum']+1;
+        }else if($status == 3){
+            $data['ztnum'] = $info['ztnum']+1;
+        }
+        $data['znum'] = $info['znum']+1;
+        
+        Db::name('check_count')->where('id',$info['id'])->update($data);
+    }else{
+        
+        //添加
+        $commuting_num = Db::name('classes')->where('id',$classesid)->value('commuting_num');
+        
+        $data['uid'] = $uid;
+        $data['attendance_group_id'] = $attendance_group_id;
+        $data['classesid'] = $classesid;
+        $data['day'] = $day;
+        $data['num'] = $commuting_num*2;
+        if($status == 1){
+            $data['zcnum'] = 1;
+        }else{
+            $data['zcnum'] = 0;
+        }
+        if($status == 2){
+            $data['cdnum'] = 1;
+        }else{
+            $data['cdnum'] = 0;
+        }
+        if($status == 3){
+            $data['ztnum'] = 1;
+        }else{
+            $data['ztnum'] = 0;
+        }
+        $data['znum'] = 1;
+        Db::name('check_count')->insert($data);
+        
+    } 
+}
+
+//返回星期几
+function days($num){
+    if($num == 1){
+        $text = '星期一';
+    }else if($num == 2){
+        $text = '星期二';
+    }else if($num == 3){
+        $text = '星期三';
+    }else if($num == 4){
+        $text = '星期四';
+    }else if($num == 5){
+        $text = '星期五';
+    }else if($num == 6){
+        $text = '星期六';
+    }else if($num == 7){
+        $text = '星期日';
+    }else{
+        $text = '无';
+    }
+    return $text;
+}
+
+//返回打卡状态
+function status($num){
+    if($num == 1){
+        $text = '正常';
+    }else if($num == 2){
+        $text = '迟到';
+    }else if($num == 3){
+        $text = '早退';
+    }else if($num == 4){
+        $text = '半天缺卡';
+    }else{
+        $text = '无';
+    }
+    return $text;
+}
+
+
+/*
+ * Effect    生成当月数组
+ * author    FuJiHui
+ * email     237813405@qq.com
+ * time      2018-12-14 10:04:19
+ * parameter date 当月日期
+ * */
+function getDateOfMonth($date)
+{
+    $timestamp = strtotime($date);
+    $j = date('t',$timestamp); //获取当前月份天数
+    $year = date('Y',$timestamp);
+    $month = date('m',$timestamp);
+    $start_time = strtotime(date($year.'-'.$month.'-01'));  //获取本月第一天时间戳
+    $mDates = array();
+    for($i=0;$i<$j;$i++){
+        $mDates[] = date('Y-m-d',$start_time+$i*86400); //每隔一天赋值给数组
+    }
+    return $mDates;
+}
+
+
+function getMoreArry($arr,$arr_count) {
+
+         $b = array();
+
+         for($y=0;$y<$arr_count;$y++){
+                for($x=0;$x<1;$x++){
+                    $b[$y][$x] = $arr[$y];
+                }
+            }
+
+         return $b;
+
+}
+
+
+//替换二维数组key
+function subOrderSearch($chuqin_list,$keyword) {
+    $chuqin_lists = array();
+    foreach($chuqin_list as $key => $val){
+        $chuqin_lists[$key][$keyword] = $val;
+    }
+    return $chuqin_lists;
+}
+
+
+//发送审批给审批人
+function start_apply($unionid,$sort){
+    
+    $whr['unionid'] = $unionid;
+    $whr['sort'] = $sort;
+    $whr['is_send'] = 1;
+    $data['is_send'] = 2;
+    $data['sub_time'] = time();
+    
+    if(Db::name('flow_apply')->where($whr)->count() > 0){
+        
+        //如果不是结束
+        if(Db::name('flow_apply')->where($whr)->value('flow_leixing') != 4){
+            
+            //如果是抄送继续下一步
+            if(Db::name('flow_apply')->where($whr)->value('flow_leixing') == 3){
+                $fl = Db::name('flow_list')->where('unionid',$unionid)->find();
+                if($fl['status'] != 3){
+                    $list = Db::name('flow_apply')->where($whr)->select();
+                    $openid = '';
+                    foreach($list as $key => $val){
+                        $openid = Db::name('weixin')->where('uid',$val['apply_uid'])->value('openid');
+                        if($openid){
+                            //根据unionid获取信息
+                            $flows = Db::name('flow_list')->field('flow_type,flow_id')->where('parentid',$val['unionid'])->find();
+                            $info = Db::name($flows['flow_type'])->where('id',$flows['flow_id'])->find();
+                            if($flows['flow_type'] == 'jiaban'){
+                                $uname = Db::name('users')->where('id',$info['uid'])->value('username');
+                                $title = $uname."「加班」审批抄送通知";
+                                
+                                if($info['leixing'] == 1){
+                                    $lxname = '日常加班 ';
+                                }else if($info['leixing'] == 2){
+                                    $lxname = '周六日加班 ';
+                                }
+                                $neirong = $info['start'].' 至 '.$info['end'];
+                                $shijian = date('m-d H:i',$val['create_time']);
+                            }else if($flows['flow_type'] == 'buka'){
+                            
+                                $uname = Db::name('users')->where('id',$info['uid'])->value('username');
+                                $title = $uname."「补卡」审批抄送通知";
+                                
+                                if($info['leixing'] == 2){
+                                    $lxname = $info['shijian'].'，迟到';
+                                }else if($info['leixing'] == 3){
+                                    $lxname = $info['shijian'].'，早退';
+                                }else if($info['leixing'] == 4){
+                                    $lxname = $info['shijian'].'，缺卡';
+                                }
+                                $neirong = $info['riqi'].' ';
+                                $neirong .=  '，'.$info['reason'];
+                                $shijian = date('m-d H:i',$val['create_time']);
+                            }else if($flows['flow_type'] == 'qingjia'){
+                               
+                                $uname = Db::name('users')->where('id',$info['uid'])->value('username');
+                                $title = $uname."「请假」审批抄送通知";
+                                
+                                if($info['leixing'] == 1){
+                                    $lxname = '事假 ';
+                                }else if($info['leixing'] == 2){
+                                    $lxname = '婚假 ';
+                                }else if($info['leixing'] == 3){
+                                    $lxname = '产假 ';
+                                }else if($info['leixing'] == 4){
+                                    $lxname = '丧假 ';
+                                }else if($info['leixing'] == 5){
+                                    $lxname = '调休 ';
+                                }
+                                $neirong = $info['start'].' 至 '.$info['end'];
+                                $shijian = date('m-d H:i',$val['create_time']);
+                            }else if($flows['flow_type'] == 'gnchuchai'){
+                                
+                                $uname = Db::name('users')->where('id',$info['uid'])->value('username');
+                                $title = $uname."「国内出差」审批抄送通知";
+                               
+                                if($info['cctype'] == 1){
+                                    $lxname = '单程';
+                                }else{
+                                    $lxname = '往返';
+                                }
+                                
+                                $neirong = $info['start'].' 至 ';
+                                $neirong .= $info['end'].' ，从 ';
+                                $neirong .= $info['chufa'].' 至 ';
+                                $neirong .= $info['mudi'].' ';
+                                $neirong = str_replace('>','',$neirong);
+                                
+                                $shijian = date('m-d H:i',$val['create_time']);
+                            }else if($flows['flow_type'] == 'gjchuchai'){
+                                
+                                $uname = Db::name('users')->where('id',$info['uid'])->value('username');
+                                $title = "「国际出差」审批抄送通知";
+                               
+                                if($info['cctype'] == 1){
+                                    $lxname = '单程';
+                                }else{
+                                    $lxname = '往返';
+                                }
+                                
+                                $neirong = $info['start'].' 至 ';
+                                $neirong .= $info['end'].' ，从 ';
+                                $neirong .= $info['chufa'].' 至 ';
+                                $neirong .= $info['mudi'].' ';
+                                
+                                $shijian = date('m-d H:i',$val['create_time']);
+                            }else if($flows['flow_type'] == 'burujia'){
+                                
+                                $uname = Db::name('users')->where('id',$info['uid'])->value('username');
+                                $title = "「哺乳假」审批抄送通知";
+                                
+                                if($info['leixing'] == 1){
+                                    $lxname = '延后上班1小时';
+                                }else if($info['leixing'] == 2){
+                                    $lxname = '提前下班1小时';
+                                }
+                                $neirong = $info['start'].' 至 '.$info['end'];
+                               
+                                $shijian = date('m-d H:i',$val['create_time']);
+                            }
+                            
+                            $dataq['title'] = $title;
+                            $dataq['leixing'] = $lxname;
+                            $dataq['neirong'] = $neirong;
+                            $dataq['shijian'] = $shijian;
+                            $dataq['openid'] = $openid;
+                            $dataq['uname'] = $uname;
+                            $dataq['type'] = 3;
+                            
+                            Db::name('wxnotice')->insert($dataq);
+                            $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                            $url=$http_type.$_SERVER['HTTP_HOST']."/api/wxnofiy/guestbook";
+                            http_curl($url,'post','json',$dataq);
+                        }
+                    }
+                    
+                    Db::name('flow_apply')->where($whr)->update($data);
+                    $sort = $sort + 1;
+                    start_apply($unionid,$sort);
+                }
+            }else{
+                
+                $list = Db::name('flow_apply')->where($whr)->select();
+                
+                $openid = '';
+                foreach($list as $key => $val){
+                    $openid = Db::name('weixin')->where('uid',$val['apply_uid'])->value('openid');
+                    if($openid){
+                       
+                        //根据unionid获取信息
+                        $flows = Db::name('flow_list')->field('flow_type,flow_id')->where('parentid',$val['unionid'])->find();
+                        $info = Db::name($flows['flow_type'])->where('id',$flows['flow_id'])->find();
+                        
+                        if($flows['flow_type'] == 'jiaban'){
+                            $uname = Db::name('users')->where('id',$info['uid'])->value('username');
+                            $title = $uname."向您发起「加班」申请待审批";
+                            if($info['leixing'] == 1){
+                                $lxname = '日常加班 ';
+                            }else if($info['leixing'] == 2){
+                                $lxname = '周六日加班 ';
+                            }
+                            $neirong = $info['start'].' 至 '.$info['end'];
+                            $shijian = date('m-d H:i',$val['create_time']);
+                        }else if($flows['flow_type'] == 'buka'){
+                        
+                            $uname = Db::name('users')->where('id',$info['uid'])->value('username');
+                            $title = $uname."向您发起「补卡」申请待审批";
+                            
+                            if($info['leixing'] == 2){
+                                $lxname = $info['shijian'].'，迟到';
+                            }else if($info['leixing'] == 3){
+                                $lxname = $info['shijian'].'，早退';
+                            }else if($info['leixing'] == 4){
+                                $lxname = $info['shijian'].'，缺卡';
+                            }
+                            $neirong = $info['riqi'].' ';
+                            $neirong .=  '，'.$info['reason'];
+                            $shijian = date('m-d H:i',$val['create_time']);
+                        }else if($flows['flow_type'] == 'qingjia'){
+                           
+                            $uname = Db::name('users')->where('id',$info['uid'])->value('username');
+                            $title = $uname."向您发起「请假」申请待审批";
+                            
+                            if($info['leixing'] == 1){
+                                $lxname = '事假 ';
+                            }else if($info['leixing'] == 2){
+                                $lxname = '婚假 ';
+                            }else if($info['leixing'] == 3){
+                                $lxname = '产假 ';
+                            }else if($info['leixing'] == 4){
+                                $lxname = '丧假 ';
+                            }else if($info['leixing'] == 5){
+                                $lxname = '调休 ';
+                            }
+                            $neirong = $info['start'].' 至 '.$info['end'];
+                            $shijian = date('m-d H:i',$val['create_time']);
+                        }else if($flows['flow_type'] == 'gnchuchai'){
+                            
+                            $uname = Db::name('users')->where('id',$info['uid'])->value('username');
+                            $title = $uname."向您发起「国内出差」申请待审批";
+                           
+                            if($info['cctype'] == 1){
+                                $lxname = '单程';
+                            }else{
+                                $lxname = '往返';
+                            }
+                            
+                            $neirong = $info['start'].' 至 ';
+                            $neirong .= $info['end'].' ，从 ';
+                            $neirong .= $info['chufa'].' 至 ';
+                            $neirong .= $info['mudi'].' ';
+                            $neirong = str_replace('>','',$neirong);
+                            
+                            $shijian = date('m-d H:i',$val['create_time']);
+                        }else if($flows['flow_type'] == 'gjchuchai'){
+                            
+                            $uname = Db::name('users')->where('id',$info['uid'])->value('username');
+                            $title = $uname."向您发起「国际出差」申请待审批";
+                           
+                            if($info['cctype'] == 1){
+                                $lxname = '单程';
+                            }else{
+                                $lxname = '往返';
+                            }
+                            
+                            $neirong = $info['start'].' 至 ';
+                            $neirong .= $info['end'].' ，从 ';
+                            $neirong .= $info['chufa'].' 至 ';
+                            $neirong .= $info['mudi'].' ';
+                            
+                            $shijian = date('m-d H:i',$val['create_time']);
+                        }else if($flows['flow_type'] == 'burujia'){
+                            
+                            $uname = Db::name('users')->where('id',$info['uid'])->value('username');
+                            $title = $uname."向您发起「哺乳假」申请待审批";
+                            
+                            if($info['leixing'] == 1){
+                                $lxname = '延后上班1小时';
+                            }else if($info['leixing'] == 2){
+                                $lxname = '提前下班1小时';
+                            }
+                            $neirong = $info['start'].' 至 '.$info['end'];
+                           
+                            $shijian = date('m-d H:i',$val['create_time']);
+                        }
+                            
+                        $dataq['title'] = $title;
+                        $dataq['leixing'] = $lxname;
+                        $dataq['neirong'] = $neirong;
+                        $dataq['shijian'] = $shijian;
+                        $dataq['openid'] = $openid;
+                        $dataq['uname'] = '';
+                        $dataq['type'] = 2;
+                        
+                        Db::name('wxnotice')->insert($dataq);
+                        $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                        $url=$http_type.$_SERVER['HTTP_HOST']."/api/wxnofiy/guestbook";
+                        http_curl($url,'post','json',$dataq);
+                        
+                    }
+                }
+                Db::name('flow_apply')->where($whr)->update($data);
+                
+            }
+            
+        }else{
+            
+            $flinfo = Db::name('flow_apply')->where($whr)->find();
+            
+            Db::name('flow_apply')->where($whr)->update($data);
+            $fl = Db::name('flow_list')->where('parentid',$unionid)->find();
+            if($fl['status'] != 3){
+                
+                $dataz['status'] = 2;
+                $dataz['update_time'] = time();
+                Db::name('flow_list')->where('parentid',$unionid)->update($dataz);
+                
+                //发送通过通知
+                //根据unionid获取信息
+                $flows = Db::name('flow_list')->field('uid,flow_type,flow_id,create_time')->where('parentid',$flinfo['unionid'])->find();
+                $info = Db::name($flows['flow_type'])->where('id',$flows['flow_id'])->find();
+                if($flows['flow_type'] == 'jiaban'){
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = $info['start'].' 至 '.$info['end'];
+                    if($info['leixing'] == 1){
+                        $neirong .= '，「日常加班」申请';
+                    }else if($info['leixing'] == 2){
+                        $neirong .= '，「周六日加班」申请';
+                    }
+                    
+                    $shijian = date('m-d H:i',$flows['create_time']);
+                }else if($flows['flow_type'] == 'buka'){
+                
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = $info['riqi'].' ';
+                    if($info['leixing'] == 2){
+                        $lxname = $info['shijian'].'，迟到';
+                    }else if($info['leixing'] == 3){
+                        $lxname = $info['shijian'].'，早退';
+                    }else if($info['leixing'] == 4){
+                        $lxname = $info['shijian'].'，缺卡';
+                    }
+                    $neirong .=  '补卡申请';
+                    
+                    $shijian = date('m-d H:i',$flows['create_time']);
+                }else if($flows['flow_type'] == 'qingjia'){
+                   
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = $info['start'].' 至 '.$info['end'];
+                    if($info['leixing'] == 1){
+                        $neirong .= '，事假 ';
+                    }else if($info['leixing'] == 2){
+                        $neirong .= '，婚假 ';
+                    }else if($info['leixing'] == 3){
+                        $neirong .= '，产假 ';
+                    }else if($info['leixing'] == 4){
+                        $neirong .= '，丧假 ';
+                    }else if($info['leixing'] == 5){
+                        $neirong .= '，调休 ';
+                    }
+                    
+                    $shijian = date('m-d H:i',$flows['create_time']);
+                }else if($flows['flow_type'] == 'gnchuchai'){
+                    
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = $info['start'].' 至 ';
+                    $neirong .= $info['end'].' ，从 ';
+                    $neirong .= $info['chufa'].' 至 ';
+                    $neirong .= $info['mudi'].' ';
+                    
+                    if($info['cctype'] == 1){
+                        $neirong .= '单程';
+                    }else{
+                        $neirong .= '往返';
+                    }
+                    $neirong = str_replace('>','',$neirong);
+                    
+                    
+                    $shijian = date('m-d H:i',$flows['create_time']);
+                }else if($flows['flow_type'] == 'gjchuchai'){
+                    
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = $info['start'].' 至 ';
+                    $neirong .= $info['end'].' ，从 ';
+                    $neirong .= $info['chufa'].' 至 ';
+                    $neirong .= $info['mudi'].' ';
+                    
+                    if($info['cctype'] == 1){
+                        $neirong .= '，单程';
+                    }else{
+                        $neirong .= '，往返';
+                    }
+                    $neirong = str_replace('>','',$neirong);
+                    
+                    $shijian = date('m-d H:i',$flows['create_time']);
+                }else if($flows['flow_type'] == 'burujia'){
+                    
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = $info['start'].' 至 '.$info['end'];
+                    if($info['leixing'] == 1){
+                        $neirong .= '，延后上班1小时';
+                    }else if($info['leixing'] == 2){
+                        $neirong .= '，提前下班1小时';
+                    }
+                    
+                   
+                    $shijian = date('m-d H:i',$flows['create_time']);
+                }
+                
+                
+                $openlist = Db::name('weixin')->field('uid,openid')->where('uid','in',$flinfo['shenqing_uid'])->select();
+                foreach ($openlist as $k => $v){
+                    if($v['openid']){
+                         //所有字段都可为空
+                        $dataq['uname'] = Db::name('users')->where('id',$v['uid'])->value('username');
+                        $dataq['neirong'] = $neirong;
+                        $dataq['shijian'] = $shijian;
+                        $dataq['openid'] = $v['openid'];
+                        $dataq['type'] = 2;
+                        Db::name('wxnotice')->insert($dataq);
+                        $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                        $url=$http_type.$_SERVER['HTTP_HOST']."/api/wxnofiy/tongzhi";
+                        http_curl($url,'post','json',$dataq);
+                    }
+                }
+            
+                
+                //添加补卡记录
+                if($fl['flow_type'] == 'buka'){
+                    $buka = Db::name($fl['flow_type'])->where('id',$fl['flow_id'])->find();
+                    
+                    $riqi = $buka['riqi'];
+                    $shijian = $buka['shijian'];
+                    $check_num = $buka['check_num'];
+                    //获取班次信息
+                    //$classesinfo = Db::name('classes')->where('id',$buka['classid'])->find();
+                  
+                    if(Db::name('flow_apply')->where('unionid',$unionid)->where('sort',$sort)->value('flow_leixing') == 4){
+                        
+                        if($buka['leixing'] == 2){
+                            
+                            $upd['shijian'] = $shijian;
+                            $upd['status'] = 1;
+                            $whr_upd['riqi'] = $riqi;
+                            $whr_upd['check_num'] = $check_num;
+                            $whr_upd['classesid']= $buka['classid'];
+                            $whr_upd['uid'] = $buka['uid'];
+                            
+                            Db::name('check_log')->where($whr_upd)->update($upd);
+                            
+                            Db::name('check_count')->where('uid',$buka['uid'])->where('attendance_group_id',Db::name('attendance_group_user')->where('uid',$buka['uid'])->value('attendance_group_id'))->where('classesid',$buka['classid'])->where('day',$riqi)->setInc('zcnum');
+                            
+                            Db::name('check_count')->where('uid',$buka['uid'])->where('attendance_group_id',Db::name('attendance_group_user')->where('uid',$buka['uid'])->value('attendance_group_id'))->where('classesid',$buka['classid'])->where('day',$riqi)->setDec('cdnum');
+                        }
+                        if($buka['leixing'] == 3){
+                            
+                            $upd['shijian'] = $shijian;
+                            $upd['status'] = 1;
+                            $whr_upd['riqi'] = $riqi;
+                            $whr_upd['check_num'] = $check_num;
+                            $whr_upd['classesid']= $buka['classid'];
+                            $whr_upd['uid'] = $buka['uid'];
+                            
+                            Db::name('check_log')->where($whr_upd)->update($upd);
+                            
+                            Db::name('check_count')->where('uid',$buka['uid'])->where('attendance_group_id',Db::name('attendance_group_user')->where('uid',$buka['uid'])->value('attendance_group_id'))->where('classesid',$buka['classid'])->where('day',$riqi)->setInc('zcnum');
+                            
+                            Db::name('check_count')->where('uid',$buka['uid'])->where('attendance_group_id',Db::name('attendance_group_user')->where('uid',$buka['uid'])->value('attendance_group_id'))->where('classesid',$buka['classid'])->where('day',$riqi)->setDec('ztnum');
+                        }
+                        if($buka['leixing'] == 4){
+                            //添加记录
+                            $add['uid'] = $buka['uid'];
+                            $add['lat'] = 0;
+                            $add['lng'] = 0;
+                            $add['attendance_group_id'] = Db::name('attendance_group_user')->where('uid',$buka['uid'])->where('status',1)->value('attendance_group_id');
+                            $add['classesid'] = $buka['classid'];
+                            $add['check_num'] = $check_num;
+                            $add['riqi'] = $riqi;
+                            $add['shijian'] = $shijian;
+                            $add['zcshijian'] = $shijian;
+                            $add['sub_time'] = time();
+                            $add['title'] = '';
+                            $add['address'] = '';
+                            $add['status'] = 1;
+                            $add['check_type'] = 1;
+                            $add['create_time'] = time();
+                            $add['update_time'] = time();
+                            
+                            Db::name('check_log')->insert($add);
+                            
+                            //每日统计增加
+                            update_check($buka['uid'],Db::name('attendance_group_user')->where('uid',$buka['uid'])->where('status',1)->value('attendance_group_id'),$buka['classid'],$riqi,1);
+                   
+                        
+                        }
+                    }
+                    
+                }
+                
+            }
+        }
+    }else{
+        $zsort = Db::name('flow_apply')->where('unionid',$unionid)->max('sort');
+        if($sort < $zsort){
+            $sort = $sort + 1;
+            start_apply($unionid,$sort);
+        }
+    }
+}
+
+/**
+ * 获取来源地址
+ * @return string
+ */
+function get_url() {
+    //获取来源地址
+    $url = "http://".$_SERVER["HTTP_HOST"].$_SERVER["REQUEST_URI"];
+    return $url;
+}
+
+
+
+// php CURL请求
+function curl($url, $post = false){
+     $ch = curl_init();
+     curl_setopt($ch, CURLOPT_URL, $url);
+     curl_setopt($ch, CURLOPT_HEADER, 0);
+     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+     if ($post) {
+         curl_setopt($ch, CURLOPT_POST, 1);
+         curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+     }
+     $result = curl_exec($ch);
+     curl_close($ch);
+     return $result;
+}
+
+function http_curl($url,$type='get',$res='json',$arr=''){
+    //1.初始化curl
+    $ch = curl_init();
+    //2.设置curl的参数
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //不验证证书
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //不验证证书
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    if ($type == 'post') {
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $arr);
+    }
+    //3.采集
+    $output = curl_exec($ch);
+    //4.关闭
+    curl_close($ch);
+    if ($res == 'json') {
+        return json_decode($output,true);
+    }
+}
+
+//查询请假名称
+function qingjia($leixing){
+    
+    if($leixing == 1){
+        $name = '事假';
+    }else if($leixing == 2){
+        $name = '婚嫁';
+    }else if($leixing == 3){
+        $name = '产假';
+    }else if($leixing == 4){
+        $name = '丧假';
+    }else if($leixing == 5){
+        $name = '调休';
+    }
+    
+    return $name;
+}
+
+
+/**
+ * 查询两个日期之间所有的日期
+ * Returns every date between two dates as an array
+ * @param string $startDate the start of the date range
+ * @param string $endDate the end of the date range
+ * @param string $format DateTime format, default is Y-m-d
+ * @return array returns every date between $startDate and $endDate, formatted as "Y-m-d"
+ */
+function createDateRange($startDate, $endDate, $format = "Y-m-d")
+{
+    $begin = new DateTime($startDate);
+    $end = new DateTime($endDate);
+ 
+    $interval = new DateInterval('P1D'); // 1 Day
+    $dateRange = new DatePeriod($begin, $interval, $end);
+ 
+    $range = [];
+    foreach ($dateRange as $date) {
+        $range[] = $date->format($format);
+    }
+ 
+    return $range;
+}

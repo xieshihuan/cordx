@@ -47,6 +47,11 @@ class AdminLog extends Base {
             'Test/index',
             'Tikus/index',
             'Tikus/is_kaohe',
+            'Template/index',
+            'TrainCate/index',
+            'TrainAssess/index',
+            'Assess/index',
+            'TrainApply/index',
             
         ];
         if(!in_array($route, $allows)){

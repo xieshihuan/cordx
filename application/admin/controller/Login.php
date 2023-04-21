@@ -21,6 +21,16 @@ use think\cache\driver\Redis;
 class Login extends Controller
 {
     
+    public function upd_shenqing(){
+        $list = Db::name('flow_list')->select();
+        foreach ($list as $key => $val){
+            $shenqing_uid = Db::name($val['flow_type'])->where('id',$val['flow_id'])->value('uid');
+            $data['shenqing_uid'] = $shenqing_uid;
+            Db::name('flow_list')->where('id',$val['id'])->update($data);
+            Db::name('flow_apply')->where('unionid',$val['unionid'])->update($data);
+        }
+    }
+    
     //获取城市列表
     public function get_country(){
         $list = Db::name('country')->select();

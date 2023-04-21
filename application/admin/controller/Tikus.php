@@ -176,7 +176,7 @@ class Tikus extends Base
             $whr = [];
             $whr[] = ['start','lt',time()];
             $whr[] = ['end','gt',time()];
-            $whr[] = ['tiku_id','=', $data['id']];
+            $whr[] = ['tiku_id','=', $id];
             $wnum = Db::name('daxuetang')->where($whr)->count();
             if($wnum == 0) {
                 $m = new M();

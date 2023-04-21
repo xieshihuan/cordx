@@ -57,12 +57,14 @@ class Count extends Base
 
 
             foreach ($list as $key => $val){
-
+                
+                $zpnum = Db::name('cateuser')->where('catid',$val['id'])->count();
+                
                 $whra['catid'] = $val['id'];
                 
                 $whra['qid'] = $qid;
                 
-                $uuid= Db::name('zdrecord_list')->field('uid')->where($whra)->buildSql(true);
+                $uuid = Db::name('zdrecord_list')->field('uid')->where($whra)->buildSql(true);
 
                 $tlist = Db::name('test')->where('uid','exp','In '.$uuid)->where('qid',$qid)->where('is_tijiao',1)->select();
 
@@ -111,7 +113,7 @@ class Count extends Base
                 $list[$key]['zscore'] = $zscore;
                 $list[$key]['avg_score'] = floatval($avg_score);
                 $list[$key]['zznum'] = count($zzlist);
-                $list[$key]['pnum'] = $dnumss;
+                $list[$key]['pnum'] = $zpnum;
                 $list[$key]['tiku_score'] = $tiku_score;
 
                 $list[$key]['parent_ids'] = $parent_ids;
@@ -477,7 +479,7 @@ class Count extends Base
             $timeKey  = array_column($list,'zscore');
             array_multisort($timeKey, SORT_ASC, $list);
         }
-
+        
         //所有人数
         $pnums = count($list);
         $b = 0;
@@ -492,9 +494,12 @@ class Count extends Base
             $avgscore = 0;
         }
         
+        $zpnum = Db::name('cateuser')->where('catid',$id)->count();
+        
         $datas['zdnum'] = 1;
         $datas['pnum'] = $b;
-        $datas['zpnum'] = $pnums;
+        //$datas['zpnum'] = $pnums;
+        $datas['zpnum'] = $zpnum;
         $datas['avgscore'] = $avgscore;
         $datas['tiku_score'] = $tiku_score;
 

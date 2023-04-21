@@ -11,14 +11,14 @@ use think\Validate;
 class Product extends Validate
 {
     protected $rule = [
-        'catid|所属分类' => [
+        'cate_id|所属分类' => [
             'require' => 'require',
         ],
-        'title|产品标题' => [
+        'type_id|所属模型' => [
             'require' => 'require',
             'max'     => '255',
         ],
-        'sort|排序' => [
+        'zhandian_id|站点' => [
             'require' => 'require',
             'number'  => 'number',
         ]

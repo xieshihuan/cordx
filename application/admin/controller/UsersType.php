@@ -5,6 +5,7 @@
  * +----------------------------------------------------------------------
  */
 namespace app\admin\controller;
+
 use think\facade\Request;
 
 //实例化默认模型

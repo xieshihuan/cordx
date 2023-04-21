@@ -33,34 +33,46 @@ class Test extends Base
         if(!empty($keyword)){
             $where[]=['u.username|u.mobile', 'like', '%'.$keyword.'%'];
         }
-        $whr['id'] = $this->admin_id;
-        $gid = Db::name('users')->where($whr)->value('group_id');
-        $ruless = Db::name('users')->where($whr)->value('ruless');
-        if($gid == 1 || $gid == 2 || $gid == 7){
-            if(!empty($catid)){
-                $whra[]=['catid', '=', $catid];
-                $uuid= Db::name('cateuser')->field('uid')->where($whra)->buildSql(true);
-            }else{
-                $whra[] = ['catid','in','1'];
-                $uuid= Db::name('cateuser')->field('uid')->where($whra)->buildSql(true);
-            }
-        }else{
+        
+        $uinfo = Db::name('users')->where('id',$this->admin_id)->find();
+        $ruless = trim($uinfo['ruless'],',');
+        
+        if($uinfo['id'] > 1){
             if(!empty($catid)){
                 if(in_array($catid,explode(',',$ruless))){
                     $whra[]=['catid', '=', $catid];
                     $uuid= Db::name('cateuser')->field('uid')->where($whra)->buildSql(true);
                 }else{
-                    $rs_arr['status'] = 201;
+                    $rs_arr['status'] = 200;
                     $rs_arr['msg'] = '无权限';
+                    $rs_arr['data'] = array();
                     return json_encode($rs_arr,true);
                     exit;
                 }
             }else{
-                $whra[] = ['catid','in',$ruless];
+                if(!empty($ruless)){
+                    $whra[] = ['catid','in',$ruless];
+                    $uuid= Db::name('cateuser')->field('uid')->where($whra)->buildSql(true);
+                }else{
+                    $rs_arr['status'] = 200;
+                    $rs_arr['msg'] = '无授权';
+                    $rs_arr['data'] = array();
+                    return json_encode($rs_arr,true);
+                    exit;
+                }
+            }
+        }else{
+            
+            if(!empty($catid)){
+                $whra[]=['catid', '=', $catid];
+                $uuid= Db::name('cateuser')->field('uid')->where($whra)->buildSql(true);
+            }else{
+                $whra[] = ['catid','>','0'];
                 $uuid= Db::name('cateuser')->field('uid')->where($whra)->buildSql(true);
             }
+            
         }
-
+        
         if(!empty($qid)){
             $where[]=['t.qid', '=', $qid];
         }
@@ -86,9 +98,18 @@ class Test extends Base
         $pageSize = Request::param('page_size') ? Request::param('page_size') : config('page_size');
         $page = Request::param('page') ? Request::param('page') : 1;
 
-        $a = $page-1;
-        $b = $a * $pageSize;
+        $a = $pageSize*($page-1);
 
+        //调取列表
+        $lists = Db::name('test')
+            ->alias('t')
+            ->leftJoin('users u','t.uid = u.id')
+            ->leftJoin('daxuetang d','t.qid = d.id')
+            ->field('t.*,u.username as username,u.mobile as mobile,u.country as country,d.title as title,d.exam_name as exam_name,d.exam_name_beizhu as exam_name_beizhu')
+            ->where('t.uid','exp','In '.$uuid)
+            ->where($where)
+            ->select();
+        
         //调取列表
         $list = Db::name('test')
             ->alias('t')
@@ -96,19 +117,22 @@ class Test extends Base
             ->leftJoin('daxuetang d','t.qid = d.id')
             ->field('t.*,u.username as username,u.mobile as mobile,u.country as country,d.title as title,d.exam_name as exam_name,d.exam_name_beizhu as exam_name_beizhu')
             ->order('qid desc,score ASC,id ASC')
+            ->limit($a.','.$pageSize)
             ->where('t.uid','exp','In '.$uuid)
             ->where($where)
             ->select();
 
         foreach ($list as $key => $val){
-            $whrb['uid'] = $val['uid'];
-            $znum = Db::name('test')->where($whrb)->count();
             
             $zscore = Db::name('tiku')->sum('score');
             $whrbb['score'] = $zscore;
             $whrbb['uid'] = $val['uid'];
             $zfnum = Db::name('test')->where($whrbb)->count();
             if($zfnum > 0){
+                //查询总次数
+                $whrb['uid'] = $val['uid'];
+                $znum = Db::name('test')->where($whrb)->count();
+                
                 $list[$key]['manfenlv'] = round($zfnum/$znum*100,2);
             }else{
                 $list[$key]['manfenlv'] = 0;
@@ -120,6 +144,7 @@ class Test extends Base
                 ->field('catid')
                 ->where($whrab)
                 ->select();
+            
             foreach ($clist as $keys => $vals){
                 $group_name = self::select_name($vals['catid']);
                 $arr = explode('/',$group_name);
@@ -132,9 +157,8 @@ class Test extends Base
             $list[$key]['clist'] = $clist;
             $list[$key]['score'] = floatval($val['score']);
         }
-
-        $data_rt['total'] = count($list);
-        $list = array_slice($list,$b,$pageSize);
+        
+        $data_rt['total'] = count($lists);
         $data_rt['data'] = $list;
 
         $rs_arr['status'] = 200;
@@ -174,7 +198,7 @@ class Test extends Base
         $b = $a * $pageSize;
 
         $uinfo = Db::name('users')->where('id',$this->admin_id)->find();
-        if($uinfo['group_id'] == 1 || $uinfo['group_id'] == 2 || $uinfo['group_id'] == 7){
+        if($uinfo['id'] == 1){
 
             $where=[];
             if(!empty($id)){
@@ -201,45 +225,29 @@ class Test extends Base
             $list= Db::name('zdrecord')->where($where)->select();
 
             foreach ($list as $key => $val){
-                //查询上级站点
-                $whra['id'] = $val['catid'];
-                $list[$key]['name'] =  Db::name('cate')->where($whra)->value('title');
-                $sjid = Db::name('cate')->where($whra)->value('parentid');
-                if($sjid > 0){
-                    $whraa['id'] = $sjid;
-                    $list[$key]['topname'] = Db::name('cate')->where($whraa)->value('title');
-                }else{
-                    $list[$key]['topname'] = '无';
-                }
                 //平均分
                 if($val['number']>0){
                     $list[$key]['avg_score'] = round($val['score']/$val['number'],2);
+                }else{
+                    $list[$key]['avg_score'] = 0;
                 }
-                //考试时间
-                $whrb['id'] = $val['qid'];
-                $list[$key]['kaohetime'] = Db::name('daxuetang')->where($whrb)->value('title');
-                $list[$key]['exam_name'] =  Db::name('daxuetang')->where($whrb)->value('exam_name');
-                $list[$key]['exam_name_beizhu'] =  Db::name('daxuetang')->where($whrb)->value('exam_name_beizhu');
             }
-            
-            $list = array_filter($list, function ($v) {
-                return $v['name'];
-            });
             
             $timeKey  = array_column($list,'avg_score');
             array_multisort($timeKey, SORT_ASC, $list);
         }else{
 
             $where=[];
-
+            $rules = trim($uinfo['ruless'],',');
             if(empty($id)){
-                $where[]=['catid', 'in', $uinfo['ruless']];
+                $where[]=['catid', 'in', $rules];
             }else{
-                if(in_array($id,explode(',',$uinfo['ruless']))){
+                if(in_array($id,explode(',',$rules))){
                     $where[]=['catid', '=', $id];
                 }else{
-                    $data_rt['status'] = 201;
+                    $data_rt['status'] = 200;
                     $data_rt['msg'] = '无权限';
+                    $data_rt['data'] = array();
                     return json_encode($data_rt,true);
                 }
             }
@@ -263,33 +271,13 @@ class Test extends Base
             $list= Db::name('zdrecord')->where($where)->select();
 
             foreach ($list as $key => $val){
-
-                //查询上级站点
-                $whra['id'] = $val['catid'];
-                $sjid = Db::name('cate')->where($whra)->value('parentid');
-                $list[$key]['name'] =  Db::name('cate')->where($whra)->value('title');
-                if($sjid > 0){
-                    $whraa['id'] = $sjid;
-                    $list[$key]['topname'] = Db::name('cate')->where($whraa)->value('title');
-                }else{
-                    $list[$key]['topname'] = '无';
-                }
                 //平均分
                 if($val['number']>0){
                     $list[$key]['avg_score'] = round($val['score']/$val['number'],2);
+                }else{
+                    $list[$key]['avg_score'] = 0;
                 }
-                //考试时间
-                $whrb['id'] = $val['qid'];
-                $list[$key]['kaohename'] =  Db::name('daxuetang')->where($whrb)->value('title');
-                $list[$key]['exam_name'] =  Db::name('daxuetang')->where($whrb)->value('exam_name');
-                $list[$key]['exam_name_beizhu'] =  Db::name('daxuetang')->where($whrb)->value('exam_name_beizhu');
-
-
             }
-            
-            $list = array_filter($list, function ($v) {
-                return $v['name'];
-            });
             
             $timeKey  = array_column($list,'avg_score');
             array_multisort($timeKey, SORT_ASC, $list);
@@ -299,6 +287,26 @@ class Test extends Base
 
         $data_rt['total'] = count($list);
         $list = array_slice($list,$b,$pageSize);
+        foreach ($list as $key => $val){
+
+            //查询上级站点
+            $whra['id'] = $val['catid'];
+            $sjid = Db::name('cate')->where($whra)->value('parentid');
+            $list[$key]['name'] =  Db::name('cate')->where($whra)->value('title');
+            if($sjid > 0){
+                $whraa['id'] = $sjid;
+                $list[$key]['topname'] = Db::name('cate')->where($whraa)->value('title');
+            }else{
+                $list[$key]['topname'] = '无';
+            }
+            //考试时间
+            $whrb['id'] = $val['qid'];
+            $list[$key]['kaohename'] =  Db::name('daxuetang')->where($whrb)->value('title');
+            $list[$key]['exam_name'] =  Db::name('daxuetang')->where($whrb)->value('exam_name');
+            $list[$key]['exam_name_beizhu'] =  Db::name('daxuetang')->where($whrb)->value('exam_name_beizhu');
+
+
+        }
         $data_rt['data'] = $list;
 
         $rs_arr['status'] = 200;

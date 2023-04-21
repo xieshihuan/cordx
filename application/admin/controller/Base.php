@@ -37,6 +37,7 @@ class Base extends Controller
                     'Index/three',      //获取三级导航
                     'Index/main',       //右侧
                     'Index/upload',     //上传文件
+                    'Index/upload_train',     //上传多文件
                     'Index/uploads',     //上传多文件
                     'Index/uploads_del',     //上传多文件
                     'Index/wangEditor', //编辑器
@@ -44,6 +45,7 @@ class Base extends Controller
                     'Index/clear',      //清除缓存
                     'Index/logout',     //退出登录
                     'Index/resetpass',  //重置密码
+                    'Index/detail',
                     'Login/index',      //登录页面
                     'Login/checkLogin', //校验登录
                     'Login/captcha',    //登录验证码
@@ -57,9 +59,31 @@ class Base extends Controller
                     'Daxuetang/select_name',
                     'Daxuetang/setmember',
                     'Users/getlist',
+                    'Tikus/index',
                     'Tikus/is_kaohe',
                     'Cateuser/check',
                     'Users/indexs',
+                    'Users/detail',
+                    'TrainApply/apply_exam',
+                    'Template/index',
+                    'Template/addpost',
+                    'Template/editpost',
+                    'Template/del',
+                    'TrainCate/index',
+                    'SpecItem/addpost',
+                    'Aptitude/company_list',
+                    'Aptitude/user_list',
+                    'ProductCate/index',
+                    'ProductType/index',
+                    'Spec/index',
+                    'AttendanceGroup/organize',
+                    'AttendanceGroup/setorganize',
+                    'AttendanceGroup/setrestrict',
+                    'AttendanceGroup/member',
+                    'AttendanceGroup/select_name',
+                    'AttendanceGroup/setmember',
+                    'AttendanceGroup/organize_status',
+                    
                 ];
         
                 //查找当前控制器和方法，控制器首字母大写，方法首字母小写 如：Index/index
@@ -71,6 +95,7 @@ class Base extends Controller
                     if($admin['data']!=1){
                         //开始认证
                         $auth = new \Auth\Auth();
+                     
                         $result = $auth->check($route,$admin['data']);
                         if(!$result){
                             $data_rt['status']= 501;
@@ -106,7 +131,6 @@ class Base extends Controller
 				->find();
 			
 			if ($res){
-			    
 				$this->admin_id = $res['id'];
 				$rs_arr['status'] = 200;
 				$rs_arr['msg']='验证通过';
@@ -130,9 +154,15 @@ class Base extends Controller
     //空操作
     public function _empty(){
         if(Request::isAjax()){
-            return ['error'=>1,'msg'=>'操作方法为空'];
+            $rs_arr['status']=201;
+			$rs_arr['msg']='操作方法为空';
+			return $rs_arr;
+			die;
         }else{
-            $this->error('操作方法为空');
+            $rs_arr['status']=201;
+			$rs_arr['msg']='操作方法为空';
+			return $rs_arr;
+			die;
         }
     }
 }

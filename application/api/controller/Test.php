@@ -725,7 +725,10 @@ class Test extends Base
             $data['repeat'] = $repeat;
             $data['create_time'] = time();
             $data['update_time'] = time();
-            Db::name('record')->insert($data);
+            
+            if(Db::name('record')->where('testid',$testid)->where('tid',$val['id'])->count() == 0){
+                Db::name('record')->insert($data);
+            }
         }
         
         //
@@ -789,6 +792,23 @@ class Test extends Base
         }
         
         $data['tlist'] = $list;
+        
+        
+        //查询待审批数量
+        $count = Db::name('flow_apply')->where('apply_uid',$this->user_id)->where('flow_leixing',2)->where('is_send',2)->where('is_read',1)->where('status',1)->count();
+        
+        $count2 = Db::name('flow_apply')->where('apply_uid',$this->user_id)->where('flow_leixing',3)->where('is_send',2)->where('is_read',1)->where('status',1)->count();
+        
+        $data['dspnum'] = $count + $count2;
+        $data['spnum'] = $count;
+        $data['csnum'] = $count2;
+        
+        $wxinfo = Db::name('weixin')->where('uid',$this->user_id)->find();
+        if($wxinfo){
+            $data['openid'] = $wxinfo['openid'];
+        }else{
+            $data['openid'] = '';
+        }
         
         $data_rt['status'] = 200;
         $data_rt['msg'] = 'success';
@@ -1081,10 +1101,10 @@ class Test extends Base
         $testid = $this->request->param('testid');
         $json = $this->request->param('json');
         
-      $fp = fopen('ceshi.txt', 'w');
-      fwrite($fp, $testid);
-      fwrite($fp, $json);
-      fclose($fp);
+    //   $fp = fopen('ceshi.txt', 'w');
+    //   fwrite($fp, $testid);
+    //   fwrite($fp, $json);
+    //   fclose($fp);
         
         if(empty($testid)){
             echo apireturn(201,'testid不能为空','');
@@ -1187,7 +1207,10 @@ class Test extends Base
             $data['repeat'] = $repeat;
             $data['create_time'] = time();
             $data['update_time'] = time();
-            Db::name('records')->insert($data);
+            
+            if(Db::name('records')->where('testid',$testid)->where('tid',$val['id'])->count() == 0){
+                Db::name('records')->insert($data);
+            }
             
         }
         //
@@ -1454,9 +1477,26 @@ class Test extends Base
             $list = Db::name('assess_type')
                 ->order('id ASC')
                 ->where($where)
+                ->where('parent_id',0)
                 ->select();
             foreach ($list as $key => $val){
-                $list[$key]['assess_score'] = 0;
+                if($val['score'] == 0){
+                    $lists = Db::name('assess_type')
+                            ->order('id ASC')
+                            ->where($where)
+                            ->where('parent_id',$val['id'])
+                            ->select();
+                    foreach ($lists as $keys => $vals){
+                        $lists[$keys]['assess_score'] = 0;
+                    }
+                    
+                }else{
+                    $list[$key]['assess_score'] = 0;
+                    $lists = array();
+                }
+                
+                $list[$key]['beizhu'] = '';
+                $list[$key]['erji'] = $lists;
             }
             
             $whrz['type'] = 1;
@@ -1467,7 +1507,50 @@ class Test extends Base
             if(count($zlist) > 0){
                 
                 
-                $zlist['answers'] = json_decode($zlist['answer'],true);
+                $answers = json_decode($zlist['answer'],true);
+                $zlist['answers'] = $answers;
+                
+           
+                $zongnum = 1;
+                $onenum = 0;
+                foreach($answers as $key =>$val){
+                    
+                    if($val['score'] == 0){
+                        
+                        $twonum = 0;
+                        foreach ($val['erji'] as $keys => $vals){
+                            //echo $vals['assess_score'].'-';
+                            if($vals['assess_score'] > 0){
+                                $twonum = $twonum + 1;
+                            }
+                            
+                            //echo $twonum.' ';
+                        }
+                        if($twonum == 0){
+                            $zongnum = 0;
+                            $onenum = 0;
+                        }else{
+                            $onenum = $onenum + 1;
+                        }
+                        //echo '!'.$twonum.'!';
+                       
+                    }else{
+                        if($val['assess_score'] > 0 ){
+                            $onenum = $onenum + 1;
+                        }
+                    }
+                }
+                //die;
+                if($onenum == 0){
+                    $zongnum = 0;
+                }
+                if($zongnum > 0){
+                    $zlist['is_submit'] = 1;
+                }else{
+                    $zlist['is_submit'] = 0;
+                }
+                
+                
                 echo apireturn(200,'success',$zlist);
                 die;
                 

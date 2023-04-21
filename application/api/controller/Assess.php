@@ -48,13 +48,32 @@ class Assess extends Base
             exit;
         }
         //调取列表
+        
         $list = Db::name('assess_type')
-            ->order('id ASC')
-            ->where($wheres)
-            ->select();
+                ->order('id ASC')
+                ->where($wheres)
+                ->where('parent_id',0)
+                ->select();
         foreach ($list as $key => $val){
-            $list[$key]['assess_score'] = 0;
+            if($val['score'] == 0){
+                $lists = Db::name('assess_type')
+                        ->order('id ASC')
+                        ->where($wheres)
+                        ->where('parent_id',$val['id'])
+                        ->select();
+                foreach ($lists as $keys => $vals){
+                    $lists[$keys]['assess_score'] = 0;
+                }
+                
+            }else{
+                $list[$key]['assess_score'] = 0;
+                $lists = array();
+            }
+            
+            $list[$key]['beizhu'] = '';
+            $list[$key]['erji'] = $lists;
         }
+        
         //调取列表
         $pnum = Db::name('assess')
             ->alias('a')
@@ -91,8 +110,49 @@ class Assess extends Base
             ->order('a.id DESC')
             ->where($where)
             ->select();
-            foreach ($list as $key => $val){
-                $list[$key]['answers'] = json_decode($val['answer']);
+            foreach ($list as $k => $v){
+                
+                $answers = json_decode($v['answer'],true);
+                $list[$k]['answers'] = $answers;
+                
+                $zongnum = 1;
+                $onenum = 0;
+                foreach($answers as $key =>$val){
+                    
+                    if($val['score'] == 0){
+                        
+                        $twonum = 0;
+                        foreach ($val['erji'] as $keys => $vals){
+                            //echo $vals['assess_score'].'-';
+                            if($vals['assess_score'] > 0){
+                                $twonum = $twonum + 1;
+                            }
+                            
+                            //echo $twonum.' ';
+                        }
+                        if($twonum == 0){
+                            $zongnum = 0;
+                            $onenum = 0;
+                        }else{
+                            $onenum = $onenum + 1;
+                        }
+                        //echo '!'.$twonum.'!';
+                       
+                    }else{
+                        if($val['assess_score'] > 0 ){
+                            $onenum = $onenum + 1;
+                        }
+                    }
+                }
+                //die;
+                if($onenum == 0){
+                    $zongnum = 0;
+                }
+                if($zongnum > 0){
+                    $list[$k]['is_submit'] = 1;
+                }else{
+                    $list[$k]['is_submit'] = 0;
+                }
             }
 
         $rs_arr['status'] = 200;
@@ -125,11 +185,28 @@ class Assess extends Base
         }
         //调取列表
         $list = Db::name('assess_type')
-            ->order('id ASC')
-            ->where($wheres)
-            ->select();
+                ->order('id ASC')
+                ->where($wheres)
+                ->where('parent_id',0)
+                ->select();
         foreach ($list as $key => $val){
-            $list[$key]['assess_score'] = 0;
+            if($val['score'] == 0){
+                $lists = Db::name('assess_type')
+                        ->order('id ASC')
+                        ->where($wheres)
+                        ->where('parent_id',$val['id'])
+                        ->select();
+                foreach ($lists as $keys => $vals){
+                    $lists[$keys]['assess_score'] = 0;
+                }
+                
+            }else{
+                $list[$key]['assess_score'] = 0;
+                $lists = array();
+            }
+            
+            $list[$key]['beizhu'] = '';
+            $list[$key]['erji'] = $lists;
         }
         
         $other = Db::name('users')->where('id',$data['otherid'])->count();

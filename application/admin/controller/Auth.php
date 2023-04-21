@@ -408,9 +408,9 @@ class Auth extends Base
     public function groupAccess(){
         $zrules = auths();
         
-        $rules = Db::name('auth_group')
+        $rules = Db::name('users')
             ->where('id',Request::param('id'))
-            ->value('rules');
+            ->value('admin_rule');
             
         $list['zrules'] = $zrules;
         $list['checkIds'] = $rules;
@@ -425,16 +425,17 @@ class Auth extends Base
 
     //用户组保存权限
     public function groupSetaccess(){
-        $rules = Request::post('rules');
-        if(empty($rules)){
-            $data_rt['status'] = 500;
-            $data_rt['msg'] = '请选择权限';
-            return json_encode($data_rt,true);
-            die;
-        }
+        $admin_rule = Request::post('admin_rule');
+        // if(empty($admin_rule)){
+        //     $data_rt['status'] = 500;
+        //     $data_rt['msg'] = '请选择权限';
+        //     return json_encode($data_rt,true);
+        //     die;
+        // }
         $data = Request::post();
         $where['id'] = $data['id'];
-        if(AuthGroup::update($data,$where)){
+        $data['token'] = '';
+        if(Users::update($data,$where)){
             $data_rt['status'] = 200;
             $data_rt['msg'] = '权限配置成功';
             return json_encode($data_rt,true);

@@ -13,11 +13,53 @@ use app\common\model\Users as M;
 
 class Login extends Controller
 {
-    
-    public function copys(){
-        $list = Db::name('recordcache')->where('testid',2375)->select();
+   public function ceshi(){
+        $dataq['leixing'] = 1;
+        $dataq['neirong'] = 2;
+        $dataq['shijian'] = 3;
+        $dataq['openid'] = 'okmxJ66KMP7U7aBtWLzezn14I8i0';
+        
+        $url="https://cutest.baoyitong.com.cn/api/wxnofiy/guestbook";
+        http_curl($url,'post','json',$dataq);
+   }
+   
+    //更新打卡统计
+    public function aaa(){
+        $list = Db::name('check_count')->select();
+        //$error = '';
+        foreach ($list as $key => $val){
+            $whr['uid'] = $val['uid'];
+            $whr['attendance_group_id'] = $val['attendance_group_id'];
+            $whr['classesid'] = $val['classesid'];
+            $whr['riqi'] = $val['day'];
+            $zcnum = Db::name('check_log')->where('status',1)->where($whr)->count();
+            $cdnum = Db::name('check_log')->where('status',2)->where($whr)->count();
+            $ztnum = Db::name('check_log')->where('status',3)->where($whr)->count();
+            // if($zcnum != $val['zcnum'] || $cdnum != $val['cdnum'] || $ztnum != $val['ztnum']){
+            //     $error .= $val['id'].'-'; 
+            // }
+            
+            $data['zcnum'] = $zcnum;
+            $data['cdnum'] = $cdnum;
+            $data['ztnum'] = $ztnum;
+            Db::name('check_count')->where('id',$val['id'])->update($data);
+            
+        }
+        
+        // echo $error;
+        // die;
+    }
+    //批量删除人员组织
+    public function ceshi_del_20221024(){
+        $list = Db::name('users')->where('is_delete',2)->select();
         foreach($list as $key => $val){
-            $ti = Db::name('recordcache')->where('testid',2378)->where('tid',$val['tid'])->find();
+            Db::name('cateuser')->where('uid',$val['id'])->delete();
+        }
+    }
+    public function copys(){
+        $list = Db::name('recordcache')->where('testid',8544)->select();
+        foreach($list as $key => $val){
+            $ti = Db::name('recordcache')->where('testid',8026)->where('tid',$val['tid'])->find();
             $data['json'] = $ti['json'];
             $data['result'] = $ti['result'];
             Db::name('recordcache')->where('id',$val['id'])->update($data);
@@ -209,8 +251,133 @@ class Login extends Controller
         return json_encode($data_rt,true);
         
     }
+    
+    //发送提醒短信
+    public function sendsms(){
+        
+        $time = date('Y-m-d',time());
+        $list = Db::name('remind')->where('remind_time',$time)->where('status',1)->select();
+        
+        foreach($list as $key => $val){
+            $phonelist = explode('^',$val['phone']);
+            foreach ($phonelist as $keys => $vals){
+                $res = saiyounotice($vals,$val['neirong']);
+                $ress = json_decode($res,true);
+                if($ress['status'] == 'success'){
+                    
+                    $data['status'] = 2;
+                    Db::name('remind')->where('id',$val['id'])->where('status',1)->update($data);
+                    
+                    echo $val['id'].'执行成功';
+                    
+                }else{
+                    
+                    $data['status'] = 3;
+                    Db::name('remind')->where('id',$val['id'])->where('status',1)->update($data);
+                    
+                    echo $val['id'].'发送失败';
+                    
+                    saiyounotice('18601366183',$val['id'].'消息提醒发送失败');
+                    saiyounotice('18331088335',$val['id'].'消息提醒发送失败');
+                }
+            }
+        }
+        
+    }
+    
+    public function ceshiduanxin(){
+        saiyounotice('18331088335','消息提醒发送失败');
+    }
 
+      /*获取access_token,不能用于获取用户信息的token*/
+  public  function getAccessToken()
+    {
+        $appid = 'wx491d0319de706ff1';  //企业appid
+        $secret = '6d82af90c4ab30acc08aa588a7f951dc';  //企业secret
 
+        $url = "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=".$appid."&secret=".$secret."";
 
+        $ch = curl_init();
+        curl_setopt($ch,CURLOPT_URL,$url);
+        curl_setopt($ch,CURLOPT_HEADER,0);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1 );
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        $res = curl_exec($ch);
+        curl_close($ch);
+        return $res;
+        exit();
+    }
+    //图片合法性验证
+    public function http_request($url, $data = null)
+    {
+        $curl = curl_init();
+        curl_setopt($curl, CURLOPT_URL, $url);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, FALSE);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, FALSE);
+
+        if (!empty($data)) {
+            curl_setopt($curl, CURLOPT_POST, TRUE);
+            curl_setopt($curl, CURLOPT_POSTFIELDS,$data);
+            curl_setopt($curl, CURLOPT_HTTPHEADER, array(
+                'Content-Type: application/json'
+            ));
+        }
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, TRUE);
+        $output = curl_exec($curl);
+        curl_close($curl);
+
+        return $output;
+        exit();
+
+    }
+    //  获取手机号
+    public function getPhoneNumber(){
+        $tmp = $this->getAccessToken();
+        $tmptoken = json_decode($tmp);
+        $token = $tmptoken->access_token;
+        $data['code'] = $_GET['code'];//前端获取code
+
+        $url = "https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=$token";
+        $info = $this->http_request($url,json_encode($data),'json');
+        // 一定要注意转json，否则汇报47001错误
+        $tmpinfo = json_decode($info,true);
+
+        print_r($tmpinfo);
+        die;
+        
+        $code = $tmpinfo->errcode;
+        $phone_info = $tmpinfo->phone_info;
+        
+        //手机号
+        $phoneNumber = $phone_info->phoneNumber;
+        if($code == '0'){
+            echo json_encode(['code'=>1,'msg'=>'请求成功','phoneNumber'=>$phoneNumber]);
+            die();
+        }else{
+            echo json_encode(['code'=>2,'msg'=>'请求失败']);
+            die();
+        }
+
+    }
+
+    //查看重复
+    public function chongfu(){
+        $list = Db::name('product_relation')->select();
+        
+        foreach ($list as $key => $val){
+            $id = '4,8,14,40,46';
+            $ids = explode(',',$id);
+            if(in_array($val['spec_id'],$ids)){
+                $whr = [];
+                $whr[] = ['product_id','<>',$val['product_id']];
+                $whr[] = ['result','=',$val['result']];
+                $cf = Db::name('product_relation')->where($whr)->select();
+                if(count($cf) > 0){
+                    echo count($cf).'-'.$val['result'].'-'.$val['product_id'].'-'.Db::name('product_relation')->where($whr)->value('product_id').' | ';
+                }
+            }
+            
+        }
+    }
 
 }

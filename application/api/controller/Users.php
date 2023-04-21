@@ -29,6 +29,8 @@ class Users extends Base
         
         $where[]=['id', '>', 1];
         
+        $where[]=['is_delete', '=', 1];
+        
         
         $whra['uid'] = $this->user_id;
         $whra['qid'] = $qid;
@@ -173,6 +175,146 @@ class Users extends Base
 		exit;
     }
     
+    public function device_status(){
+        $status = Request::param('status');
+        $data['device_status'] = $status;
+        
+        Db::name('users')->where('id',$this->user_id)->update($data);
+        
+        $rs_arr['status'] = 200;
+		$rs_arr['msg'] = 'success';
+		return json_encode($rs_arr,true);
+		exit;
+    }
+    
+    //查询设备统计
+    public function zichan(){
+        $where['id'] = $this->user_id;
+        $uinfo = Db::name('users')->field('id,username,mobile,group_device,train_ruless')->where($where)->find();
+        
+        $wherec = [];
+     
+        $whra['uid'] = $this->user_id;
+        $whra['leixing'] = 1;
+        $clist = Db::name('cateuser')
+        ->where($whra)
+        ->select();
+        
+        if(count($clist) > 0){
+            foreach ($clist as $keys => $vals){
+                if($vals['catid'] > 0){
+                    $group_name = self::select_name($vals['catid']);
+                    $arr = explode('/',$group_name);
+                    $arrs = array_reverse($arr);
+                    $group_list = implode(' | ',$arrs);
+                    $group_list = ltrim($group_list,' | ');
+                    $clist[$keys]['group_name'] = $group_list;
+                }else{
+                    $clist[$keys]['group_name'] = '';
+                }
+            } 
+        }else{
+            $clist = array();
+        }
+        
+        $data['clist'] = $clist;
+        
+        
+        $data['username'] = $uinfo['username'];
+        $data['mibile'] = $uinfo['mobile'];
+        $data['group_id'] = $uinfo['group_device'];
+        
+        
+        
+        //我的资产汇总
+        $user_zichan_count = Db::name('product')->where('uid',$this->user_id)->count();
+        //我的资产详细
+        $user_zichan = Db::name('product_cate')->field('id,title')->order('id asc')->select();
+        foreach ($user_zichan as $key => $val){
+            $whr['cate_id'] = $val['id'];
+            $whr['uid'] = $this->user_id;
+            $user_zichan[$key]['number'] = Db::name('product')->where($whr)->count();
+        }
+        
+        if(!empty($zhandian_id)){
+            if($uinfo['id'] == 1){
+            
+                //查询当前站点及所属下级站点
+                $cate = Db::name('cate')->select();
+                $xz = getChildsId($cate,$zhandian_id);
+                
+                $itemz = '';
+                foreach($xz as $valxz){
+                    $itemz .= $valxz['id'].',';
+                }
+                $idxzs = $itemz.$zhandian_id;
+                $wherec[] = ['zhandian_id','in',$idxzs];
+            
+            }else{
+                $ruless = explode(',',$uinfo['train_ruless']);
+               
+                if(in_array($zhandian_id,$ruless)){
+                    $wherec[] = ['zhandian_id','=',$zhandian_id];
+                }else{
+                    $rs_arr['status'] = 201;
+                    $rs_arr['msg'] = '站点id有误';
+                    return json_encode($rs_arr,true);
+                    exit;
+                }
+            }
+        }else{
+            if($uinfo['id'] == 1){
+                $wherec[] = ['zhandian_id','>',0];
+            }else{
+                $ruless = explode(',',$uinfo['train_ruless']);
+                $wherec[] = ['zhandian_id','in',$uinfo['train_ruless']];
+            }
+        }
+        
+        //站点资产汇总
+        $zhandian_zichan_count = Db::name('product')->where($wherec)->count();
+        //站点资产详细
+        $zhandian_zichan = Db::name('product_cate')->field('id,title')->order('id asc')->select();
+        foreach ($zhandian_zichan as $key => $val){
+            $whr_zhan['cate_id'] = $val['id'];
+            $zhandian_zichan[$key]['number'] = Db::name('product')->where($whr_zhan)->where($wherec)->count();
+        }
+        
+        $data['user_zichan_count'] = $user_zichan_count;
+        $data['user_zichan_list'] = $user_zichan;
+        $data['zhandian_zichan_count'] = $zhandian_zichan_count;
+        $data['zhandian_zichan'] = $zhandian_zichan;
+        
+        
+        $rs_arr['status'] = 200;
+		$rs_arr['msg'] = 'success';
+		$rs_arr['data'] = $data;
+		return json_encode($rs_arr,true);
+		exit;
+    }
+    
+    public function select_name($id){
+        $str = '';
+        $whr['id'] = $id;
+        $info = Db::name('cate')->where($whr)->find();
+        $str .= $info['title'].'/';
+        
+        if($id != 1){
+            $str .= self::select_name($info['parentid']);
+        }
+        
+        return $str;
+    }
+    
+    //绑定openid
+    public function bind_openid(){
+        $openid = Request::param('openid');
+        $data['openid'] = $openid;
+        $data['uid'] = $this->user_id;
+        
+        Db::name('weixin')->insert($data);
+        echo apireturn(200,'success','');die;
+    }
     
     
 }

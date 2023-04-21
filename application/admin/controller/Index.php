@@ -24,13 +24,16 @@ class Index extends Base
     {
         $authtoken = Request::param('authtoken');
         $admin_id = Db::name('users')->where('token',$authtoken)->value('id');
+        $admin_rule = Db::name('users')->where('token',$authtoken)->value('admin_rule');
         
-        $group_id = Db::name('auth_group_access')->where('uid',$admin_id)->value('group_id');
+        // $group_id = Db::name('auth_group_access')->where('uid',$admin_id)->value('group_id');
             
-        $rules = Db::name('auth_group')
-            ->where('id',$group_id)
-            ->value('rules');
-            $rules = explode(',',$rules);
+        // $rules = Db::name('auth_group')
+        //     ->where('id',$group_id)
+        //     ->value('rules');
+            
+            
+            $rules = explode(',',$admin_rule);
             
         $authRule = AuthRule::where('status',1)
             ->order('sort asc')
@@ -82,12 +85,14 @@ class Index extends Base
         $authtoken = Request::param('authtoken');
         $pid = Request::param('pid');
         $admin_id = Db::name('users')->where('token',$authtoken)->value('id');
-        $group_id = Db::name('auth_group_access')->where('uid',$admin_id)->value('group_id');
+        $admin_rule = Db::name('users')->where('token',$authtoken)->value('admin_rule');
+        
+        // $group_id = Db::name('auth_group_access')->where('uid',$admin_id)->value('group_id');
             
-        $rules = Db::name('auth_group')
-            ->where('id',$group_id)
-            ->value('rules');
-            $rules = explode(',',$rules);
+        // $rules = Db::name('auth_group')
+        //     ->where('id',$group_id)
+        //     ->value('rules');
+            $rules = explode(',',$admin_rule);
             
         $authRule = AuthRule::where('status',1)->where('pid',$pid)->where('auth_open',1)
             ->order('sort asc')
@@ -131,7 +136,8 @@ class Index extends Base
         
         return json_encode($data_rt,true);
     }
-
+    
+    
   
     //上传文件
     public function upload(){
@@ -232,7 +238,83 @@ class Index extends Base
     		exit;
         }
     }
+    
+    //资质图片查询
+    public function detail(){
+        $id = Request::param('id');
+        $type = Request::param('type');
+        
+        if(!empty($id)){
+            $where[]=['id', '=', $id];
+        }else{
+            $rs_arr['status'] = 500;
+    		$rs_arr['msg'] = 'id不能为空';
+    		return json_encode($rs_arr,true);
+    		exit;
+        }
+        if($type == 1){
+            $ainfo = Db::name('register_credential')->where($where)->find();
+        }elseif($type == 2){
+            $ainfo = Db::name('brand')->where($where)->find();
+        }elseif($type == 3){
+            $ainfo = Db::name('other')->where($where)->find();
+        }else{
+            $ainfo = Db::name('brand_world')->where($where)->find();
+        }
+        
+        
+        if(!empty($ainfo['images'])){
+            $alist = explode(',',$ainfo['images']);
+            foreach ($alist as $key => $val){
+                $wheres['id'] = $val;
+                $alist[$key] = Db::name('img')->field('id,thumb')->where($wheres)->find();
+                $request = Request::instance();
+                $domain = $request->domain();
+                $alist[$key]['url'] = $domain.$alist[$key]['thumb'];
+            }
+            $ainfo['duotu'] = $alist;
+        }else{
+            $ainfo['duotu'] = array();
+        }
+        
+        $rs_arr['status'] = 200;
+        $rs_arr['msg'] = 'success';
+        $rs_arr['data'] = $ainfo;
+		return json_encode($rs_arr,true);
+		exit;
+    }   
+    
+    
+    //上传文件
+    public function upload_train(){
+        //file是传文件的名称，这是webloader插件固定写入的。因为webloader插件会写入一个隐藏input，不信你们可以通过浏览器检查页面
+        $file = request()->file('images');
+        $info = $file->validate(['ext' => 'jpg,png,gif,jpeg'])->move('uploads/train');
 
+        if($info){
+            // 成功上传后 获取上传信息
+            // 输出 jpg
+            //echo $info->getExtension();
+            // 输出 20160820/42a79759f284b767dfcb2a0197904287.jpg
+            $url =  "/uploads/train/".$info->getSaveName();
+            
+            $url = str_replace("\\","/",$url);
+            
+            $result['code'] =200;
+            $result['msg'] = '上传成功';
+            $result['data'] = $url;
+            return json_encode($result,true);
+            
+            // 输出 42a79759f284b767dfcb2a0197904287.jpg
+            //echo $info->getFilename();
+        }else{
+            // 上传失败获取错误信息
+            $result['code'] = 500;
+            $result['msg'] = $file->getError();
+            return json_encode($result,true);
+        }
+    }
+   
 
     //wangEditor
     public function wangEditor(){

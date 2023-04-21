@@ -22,7 +22,7 @@ class Message extends Base
         $pageSize = Request::param('page_size') ? Request::param('page_size') : config('page_size');
         //调取列表
       
-        $list = Db::name('message')
+        $list = Db::name('train_message')
             ->field('*')
             ->order('sort ASC,id DESC')
             ->paginate($pageSize,false,['query' => request()->param()]);
