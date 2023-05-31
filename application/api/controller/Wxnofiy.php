@@ -8,6 +8,7 @@ class Wxnofiy{
     
     //审批通知
     public function guestbook(){
+      
         //此处模拟前端表单ajax提交
         $input_data = input();
         $title=$input_data['title'];
@@ -16,13 +17,14 @@ class Wxnofiy{
         $shijian=$input_data['shijian'];
         $uname=$input_data['uname'];
 
+        
         if(isset($input_data) && !empty($input_data)){
             $set_up =  Db::name('setup')->where("id",1)->find();
             
             $openid=$input_data['openid'];
             
             if($input_data['type'] == 3){
-                $pagepath = "/pages/approve-admin/user-approve/index?spNum=2";
+                $pagepath = "/pageCheckApprove/pages/user-approve/index?spNum=2";
                 //提交成功，触发信息推送
                 $data=[
                     'touser'=>$openid,
@@ -43,7 +45,7 @@ class Wxnofiy{
                     )
                 ];
             }else{
-                $pagepath = "/pages/approve-admin/user-approve/index?spNum=0";
+                $pagepath = "/pageCheckApprove/pages/user-approve/index?spNum=0";
                     //提交成功，触发信息推送
                 $data=[
                     'touser'=>$openid,
@@ -63,24 +65,15 @@ class Wxnofiy{
                     )
                 ];
             }
-    
-            $get_all_access_token = $this->get_all_access_token();
-
-
-            $json_data=json_encode($data);//转化成json数组让微信可以接收
-            $url="https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=".$get_all_access_token;//模板消息请求URL
-
-            $res=$this->https_request($url,urldecode($json_data));
-            //请求开始
-            $res=json_decode($res,true);
-            var_dump($res);
-            die;
-            if($res['errcode']==0 && $res['errmsg']=="ok"){ 
-            //发送成功    
-                echo apireturn(200,'success','');die;
-            }else{
-                echo apireturn(201,'success','');die;
-            }
+            $access_token = $this->get_all_access_token();
+            $params = json_encode($data,JSON_UNESCAPED_UNICODE);
+            $start_time = microtime(true);
+            $fp = fsockopen('ssl://api.weixin.qq.com', 443, $error, $errstr, 1);
+            $http = "POST /cgi-bin/message/template/send?access_token={$access_token} HTTP/1.1\r\nHost: api.weixin.qq.com\r\nContent-type: application/x-
+            www-form-urlencoded\r\nContent-Length: " . strlen($params) . "\r\nConnection:close\r\n\r\n$params\r\n\r\n";
+            fwrite($fp, $http);
+            fclose($fp);
+            //print_r(microtime(true) - $start_time);
             
         }
     }
@@ -98,7 +91,7 @@ class Wxnofiy{
             
             $openid=$input_data['openid'];
             
-            $pagepath = "/pages/approve-admin/user-record/index";
+            $pagepath = "/pageCheckApprove/pages/user-record/index";
             
             if($input_data['type'] == 2){
                 $status = '审核通过';
@@ -123,22 +116,14 @@ class Wxnofiy{
                 )
             ];
 
-            $get_all_access_token = $this->get_all_access_token();
-
-
-            $json_data=json_encode($data);//转化成json数组让微信可以接收
-            $url="https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=".$get_all_access_token;//模板消息请求URL
-
-            $res=$this->https_request($url,urldecode($json_data));
-            //请求开始
-            $res=json_decode($res,true);
-            
-            if($res['errcode']==0 && $res['errmsg']=="ok"){ 
-            //发送成功    
-                echo apireturn(200,'success','');die;
-            }else{
-                echo apireturn(201,'success','');die;
-            }
+            $access_token = $this->get_all_access_token();
+            $params = json_encode($data,JSON_UNESCAPED_UNICODE);
+            $start_time = microtime(true);
+            $fp = fsockopen('ssl://api.weixin.qq.com', 443, $error, $errstr, 1);
+            $http = "POST /cgi-bin/message/template/send?access_token={$access_token} HTTP/1.1\r\nHost: api.weixin.qq.com\r\nContent-type: application/x-
+            www-form-urlencoded\r\nContent-Length: " . strlen($params) . "\r\nConnection:close\r\n\r\n$params\r\n\r\n";
+            fwrite($fp, $http);
+            fclose($fp);
             
         }
     }
@@ -170,12 +155,14 @@ class Wxnofiy{
                 )
             ];
 
-            $get_all_access_token = $this->get_all_access_token();
-
-            $json_data=json_encode($data);//转化成json数组让微信可以接收
-            $url="https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=".$get_all_access_token;//模板消息请求URL
-
-            $this->https_request($url,urldecode($json_data));
+            $access_token = $this->get_all_access_token();
+            $params = json_encode($data,JSON_UNESCAPED_UNICODE);
+            $start_time = microtime(true);
+            $fp = fsockopen('ssl://api.weixin.qq.com', 443, $error, $errstr, 1);
+            $http = "POST /cgi-bin/message/template/send?access_token={$access_token} HTTP/1.1\r\nHost: api.weixin.qq.com\r\nContent-type: application/x-
+            www-form-urlencoded\r\nContent-Length: " . strlen($params) . "\r\nConnection:close\r\n\r\n$params\r\n\r\n";
+            fwrite($fp, $http);
+            fclose($fp);
             
         }
     }
@@ -203,17 +190,110 @@ class Wxnofiy{
                     'first'=>array('value'=>$uname.'，您好：','color'=>"#fc0101"),
                     'keyword1'=>array('value'=>$title,'color'=>"#173177"), 
                     'keyword2'=>array('value'=>$neirong,'color'=>"#173177"), 
+                    'remark'=>array('value'=>'点击查看详情,若有疑问请联系站点人事','color'=>"#173177"),
+                )
+            ];
+
+            $access_token = $this->get_all_access_token();
+            $params = json_encode($data,JSON_UNESCAPED_UNICODE);
+            $start_time = microtime(true);
+            $fp = fsockopen('ssl://api.weixin.qq.com', 443, $error, $errstr, 1);
+            $http = "POST /cgi-bin/message/template/send?access_token={$access_token} HTTP/1.1\r\nHost: api.weixin.qq.com\r\nContent-type: application/x-
+            www-form-urlencoded\r\nContent-Length: " . strlen($params) . "\r\nConnection:close\r\n\r\n$params\r\n\r\n";
+            fwrite($fp, $http);
+            fclose($fp);
+        }
+    }
+    
+    //审批结果通知
+    public function chehui_notice(){
+        
+        $input_data = input();
+        $uname=$input_data['uname'];
+        $neirong=$input_data['neirong'];
+        $shijian=$input_data['shijian'];
+        
+        //此处模拟前端表单ajax提交
+        if(isset($input_data) && !empty($input_data)){
+            $set_up =  Db::name('setup')->where("id",1)->find();
+            
+            $openid=$input_data['openid'];
+            
+            $pagepath = "/pageCheckApprove/pages/user-approve/index?spNum=1";
+            
+            //提交成功，触发信息推送
+            $data=[
+                'touser'=>$openid,
+                'template_id'=>'xsdHIRebsaw_IldNS3x2BgCA1MYjXcEIyuvaf0L5aNA',
+                "url"=>"",
+                "miniprogram"=>array(
+                     "appid"=>"wx491d0319de706ff1",
+                     "pagepath"=>$pagepath,
+                ),
+                'topcolor'=>"#FF0000",
+                'data'=>array(
+                    'first'=>array('value'=>'您有一条审批撤回提醒！','color'=>"#fc0101"),
+                    'keyword1'=>array('value'=>$neirong,'color'=>"#173177"), 
+                    'keyword2'=>array('value'=>$uname,'color'=>"#173177"), 
+                    'keyword3'=>array('value'=>$shijian,'color'=>"#173177"), 
                     'remark'=>array('value'=>'点击查看详情','color'=>"#173177"),
                 )
             ];
 
-            $get_all_access_token = $this->get_all_access_token();
+            $access_token = $this->get_all_access_token();
+            $params = json_encode($data,JSON_UNESCAPED_UNICODE);
+            $start_time = microtime(true);
+            $fp = fsockopen('ssl://api.weixin.qq.com', 443, $error, $errstr, 1);
+            $http = "POST /cgi-bin/message/template/send?access_token={$access_token} HTTP/1.1\r\nHost: api.weixin.qq.com\r\nContent-type: application/x-
+            www-form-urlencoded\r\nContent-Length: " . strlen($params) . "\r\nConnection:close\r\n\r\n$params\r\n\r\n";
+            fwrite($fp, $http);
+            fclose($fp);
+            
+        }
+    }
+    
+    //设备赠与通知
+    public function gift_notice(){
+        
+        $input_data = input();
+        $neirong=$input_data['neirong'];
+        $shijian=$input_data['shijian'];
+        
+        //此处模拟前端表单ajax提交
+        if(isset($input_data) && !empty($input_data)){
+            $set_up =  Db::name('setup')->where("id",1)->find();
+            
+            $openid=$input_data['openid'];
+            
+            $pagepath = "/pages/device-admin/device-info/index?type=2&id=".$input_data['product_id']."&applyId=";
+            
+            //提交成功，触发信息推送
+            $data=[
+                'touser'=>$openid,
+                'template_id'=>'xevYFJYoUItJZ2nC-_YVYqSTT_1279tfSKlR1hxf9aQ',
+                "url"=>"",
+                "miniprogram"=>array(
+                     "appid"=>"wx491d0319de706ff1",
+                     "pagepath"=>$pagepath,
+                ),
+                'topcolor'=>"#FF0000",
+                'data'=>array(
+                    'first'=>array('value'=>'您有一条设备状态变更提醒！','color'=>"#fc0101"),
+                    'keyword1'=>array('value'=>$neirong,'color'=>"#173177"), 
+                    'keyword2'=>array('value'=>$shijian,'color'=>"#173177"), 
+                    'remark'=>array('value'=>'点击查看详情','color'=>"#173177"),
+                )
+            ];
 
-
-            $json_data=json_encode($data);//转化成json数组让微信可以接收
-            $url="https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=".$get_all_access_token;//模板消息请求URL
-
-            $this->https_request($url,urldecode($json_data));
+            $access_token = $this->get_all_access_token();
+            $params = json_encode($data,JSON_UNESCAPED_UNICODE);
+            $start_time = microtime(true);
+            $fp = fsockopen('ssl://api.weixin.qq.com', 443, $error, $errstr, 1);
+            $http = "POST /cgi-bin/message/template/send?access_token={$access_token} HTTP/1.1\r\nHost: api.weixin.qq.com\r\nContent-type: application/x-
+            www-form-urlencoded\r\nContent-Length: " . strlen($params) . "\r\nConnection:close\r\n\r\n$params\r\n\r\n";
+            fwrite($fp, $http);
+            fclose($fp);
+            
         }
     }
  
@@ -235,7 +315,7 @@ class Wxnofiy{
 
  //微信access_token默认时间是7200s，设置每6000s获取一次并保存入库
     public function get_all_access_token(){
-      $access_token_jilu = Db::name('setup')->where('id',1)->find();
+       $access_token_jilu = Db::name('setup')->where('id',1)->find();
        if(time()-$access_token_jilu['token_exp']>600){
             $appid = $access_token_jilu['appid'];
             $secret = $access_token_jilu['appsecret'];
@@ -281,6 +361,6 @@ class Wxnofiy{
             return json_decode($output,true);
         }
     }
-
+    
 
 }

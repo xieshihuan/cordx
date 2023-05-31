@@ -24,7 +24,8 @@
         "phpoffice/phpexcel": "^1.8",
         "zzstudio/think-addons": "^1.0",
         "tecnickcom/tcpdf": "^6.4",
-        "dsiddharth2/php-zxing": "dev-master"
+        "dsiddharth2/php-zxing": "dev-master",
+        "phpoffice/phpspreadsheet": "^1.5"
     },
     "autoload": {
         "psr-4": {

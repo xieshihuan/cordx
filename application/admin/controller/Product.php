@@ -8,6 +8,7 @@ namespace app\admin\controller;
 use app\common\model\Cate;
 use think\Db;
 use think\facade\Request;
+use think\facade\Env;
 
 //实例化默认模型
 use app\common\model\Product as M;
@@ -42,7 +43,7 @@ class Product extends Base
             $where[]=['p.type_id', '=', $type_id];
         }
         if(!empty($status)){
-            $where[]=['p.status', '=', $status];
+            $where[]=['p.status', 'in', $status];
         }
         
         $uinfo = Db::name('users')->where('id',$this->admin_id)->find();
@@ -221,6 +222,16 @@ class Product extends Base
             $list = seacharr_by_value($list,'submit_group_id',$group);
         }
         
+        $zycount = seacharr_by_value($list,'status',1);
+        $xzcount = seacharr_by_value($list,'status',2);
+        $bfcount = seacharr_by_value($list,'status',3);
+        $zengcount = seacharr_by_value($list,'status',4);
+        
+        $data_rt['zycount'] = count($zycount);
+        $data_rt['xzcount'] = count($xzcount);
+        $data_rt['bfcount'] = count($bfcount);
+        $data_rt['zengcount'] = count($zengcount);
+        
         
         $data_rt['total'] = count($list);
         $list = array_slice($list,$b,$pageSize);
@@ -239,6 +250,8 @@ class Product extends Base
             $list[$keys]['submit_username'] = Db::name('users')->where('id',$vals['zhandian_uid'])->value('username');
         }
         $data_rt['data'] = $list;
+        
+        
         //调取列表
         $rs_arr['status'] = 200;
 		$rs_arr['msg'] = 'success';
@@ -774,4 +787,157 @@ class Product extends Base
             exit;
         }
     }
+    
+    
+    //赠与记录
+    public function gift_list(){
+        //条件筛选
+        $keyword = Request::param('keyword');
+        $leixing = Request::param('leixing');
+        $cate_id = Request::param('cate_id');
+        $type_id = Request::param('type_id');
+        
+        $date_type = Request::param('date_type');
+        $start = Request::param('start');
+        $end = Request::param('end');
+        $items = Request::param('items');
+        //全局查询条件
+        $where=[];
+
+        if(!empty($cate_id)){
+            $where[]=['p.cate_id', '=', $cate_id];
+        } 
+        if(!empty($type_id)){
+            $where[]=['p.type_id', '=', $type_id];
+        }
+        if(!empty($leixing)){
+            $where[]=['g.leixing', 'in', $leixing];
+        }
+        if(!empty($keyword)){
+            $where[]=['g.username', 'like', '%'.$keyword.'%'];
+        }
+        
+        if(isset($date_type)&&$date_type!=""){
+            if($date_type == 1){
+                if(isset($start)&&$start!=""&&isset($end)&&$end=="")
+                {
+                    $where[] = ['g.gift_time','>=',$start];
+                }
+                if(isset($end)&&$end!=""&&isset($start)&&$start=="")
+                {
+                    $where[] = ['g.gift_time','<=',$end];
+                }
+                if(isset($start)&&$start!=""&&isset($end)&&$end!="")
+                {
+                    $where[] = ['g.gift_time','between',[$start,$end]];
+                }
+            }else{
+                if(isset($start)&&$start!=""&&isset($end)&&$end=="")
+                {
+                    $where[] = ['g.create_time','>=',$start];
+                }
+                if(isset($end)&&$end!=""&&isset($start)&&$start=="")
+                {
+                    $where[] = ['g.create_time','<=',$end];
+                }
+                if(isset($start)&&$start!=""&&isset($end)&&$end!="")
+                {
+                    $where[] = ['g.create_time','between',[$start,$end]];
+                }
+            }
+        }      
+        
+        
+        //显示数量
+        $pageSize = Request::param('page_size') ? Request::param('page_size') : config('page_size');
+        $page = Request::param('page') ? Request::param('page') : 1;
+
+        $a = $page-1;
+        $b = $a * $pageSize;
+
+        if(!empty($items)){
+            $items = trim($items,'^');
+            $itemids = explode('^',$items);
+            $ids = '';
+            foreach($itemids as $val){
+                
+                $item = sellist($ids,$val);
+                
+                $itemq = '';
+                foreach($item as $vals){
+                    $itemq .= $vals['product_id'].',';
+                }
+                
+                $itemq = rtrim($itemq,',');
+                
+                $whrs[] = ['product_id','in',$itemq];
+            }
+            
+            $itemid = Db::name('product_relation')->field('product_id')->where($whrs)->buildSql(true);
+            
+            $list = Db::name('gift')
+                ->alias('g')
+                ->leftJoin('product p','g.product_id = p.id')
+                ->leftJoin('product_cate cate','p.cate_id = cate.id')
+                ->leftJoin('product_type type','p.type_id = type.id')
+                ->field('g.*,p.uid,p.zhandian_uid,cate.title as cate_name,type.title as type_name')
+                ->order('g.gift_time desc,g.create_time desc,p.id DESC')
+                ->where($where)
+                ->where('p.id','exp', 'In '.$itemid)
+                ->select();
+        }else{
+            $list = Db::name('gift')
+                ->alias('g')
+                ->leftJoin('product p','g.product_id = p.id')
+                ->leftJoin('product_cate cate','p.cate_id = cate.id')
+                ->leftJoin('product_type type','p.type_id = type.id')
+                ->field('g.*,p.uid,p.zhandian_uid,cate.title as cate_name,type.title as type_name')
+                ->order('g.gift_time desc,g.create_time desc,p.id DESC')
+                ->where($where)
+                ->select();
+        }
+        
+        $data_rt['total'] = count($list);
+        $list = array_slice($list,$b,$pageSize);
+        
+        foreach($list as $key => $val){
+            if($val['leixing'] == 1){
+                $list[$key]['leixing_name'] = '赠与组织内部人员';
+            }else{
+                $list[$key]['leixing_name'] = '赠与外部公司/人员';
+            }
+            
+            if($val['reason_type'] == 1){
+                $list[$key]['reason_type_name'] = '人员离职';
+            }else if($val['reason_type'] == 2){
+                $list[$key]['reason_type_name'] = '项目运营';
+            }else if($val['reason_type'] == 3){
+                $list[$key]['reason_type_name'] = '人际往来';
+            }else if($val['reason_type'] == 4){
+                $list[$key]['reason_type_name'] = '慈善捐助';
+            }else{
+                $list[$key]['reason_type_name'] = '其他';
+            }
+            
+            $list[$key]['group_name'] = Db::name('cate')->where('id',$val['group_id'])->value('title');
+            $list[$key]['mobile'] = Db::name('users')->where('id',$val['uid'])->value('mobile');
+            $list[$key]['confirm_username'] = Db::name('users')->where('id',$val['confirm_uid'])->value('username');
+            $list[$key]['operate_username'] = Db::name('users')->where('id',$val['operate_uid'])->value('username');
+            $photo_list = Db::name('product_image')->where('id','in',$val['image'])->select();
+            foreach ($photo_list as $keys => $vals){
+                $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                $photo_list[$keys]['url'] = $http_type.$_SERVER['HTTP_HOST'].$vals['url'];
+            }
+            $list[$key]['photo_list'] = $photo_list;
+        }
+        $data_rt['data'] = $list;
+        //调取列表
+        $rs_arr['status'] = 200;
+		$rs_arr['msg'] = 'success';
+		$rs_arr['data'] = $data_rt;
+		return json_encode($rs_arr,true);
+		exit;
+    }
+    
+    
 }

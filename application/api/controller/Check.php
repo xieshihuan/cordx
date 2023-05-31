@@ -80,6 +80,8 @@ class Check extends Base
             $classids = Db::name('attendance_group')->where('id',$info['attendance_group_id'])->value('classes_ids');
             if(!empty($classids)){
                 $list = Db::name('classes')->where('id','in',$classids)->select();
+                
+                
                 foreach($list as $key => $v){
                     $one_in = strtotime($v['one_in']);
                     $one_out = strtotime($v['one_out']);

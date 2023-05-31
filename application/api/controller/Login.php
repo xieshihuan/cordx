@@ -13,14 +13,21 @@ use app\common\model\Users as M;
 
 class Login extends Controller
 {
-   public function ceshi(){
-        $dataq['leixing'] = 1;
-        $dataq['neirong'] = 2;
-        $dataq['shijian'] = 3;
-        $dataq['openid'] = 'okmxJ66KMP7U7aBtWLzezn14I8i0';
-        
-        $url="https://cutest.baoyitong.com.cn/api/wxnofiy/guestbook";
-        http_curl($url,'post','json',$dataq);
+   public function get_fieldlist(){
+       
+       $arr = get_fieldlist('tp_ruzhi');
+       print_r($arr);
+       die;
+   }
+   public function ceshiqqq11111(){
+       $a = 38.901603;
+       $b = 115.569456;
+       $c = 38.90361;
+       $d = 115.566915;
+       $jl = getDistance($a,$b,$c,$d,$len_type = 1,$decimal = 2);
+       echo $jl;
+       //echo date('W',strtotime('2024-01-01'));
+       die;
    }
    
     //更新打卡统计
@@ -45,21 +52,34 @@ class Login extends Controller
             Db::name('check_count')->where('id',$val['id'])->update($data);
             
         }
-        
         // echo $error;
         // die;
     }
     //批量删除人员组织
-    public function ceshi_del_20221024(){
-        $list = Db::name('users')->where('is_delete',2)->select();
-        foreach($list as $key => $val){
-            Db::name('cateuser')->where('uid',$val['id'])->delete();
+    public function ceshi_tzs(){
+        //69,191,295,492,570,609,746,875,908
+        $openlist = Db::name('weixin')->field('uid,openid')->where('uid','in','875')->select();
+        $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+        $url=$http_type.$_SERVER['HTTP_HOST']."/api/wxnofiy/tongzhi";
+                
+        foreach ($openlist as $k => $v){
+            if($v['openid']){
+                 //所有字段都可为空---审批拒绝
+                $dataq['uname'] = Db::name('users')->where('id',$v['uid'])->value('username');
+                $dataq['neirong'] = '测试速度';
+                $dataq['shijian'] = '测试时间';
+                $dataq['openid'] = $v['openid'];
+                $dataq['type'] = 3;
+                Db::name('wxnotice')->insert($dataq);
+                
+                http_curl($url,'post','json',$dataq);
+            }
         }
     }
     public function copys(){
-        $list = Db::name('recordcache')->where('testid',8544)->select();
+        $list = Db::name('recordcache')->where('testid',10347)->select();
         foreach($list as $key => $val){
-            $ti = Db::name('recordcache')->where('testid',8026)->where('tid',$val['tid'])->find();
+            $ti = Db::name('recordcache')->where('testid',10219)->where('tid',$val['tid'])->find();
             $data['json'] = $ti['json'];
             $data['result'] = $ti['result'];
             Db::name('recordcache')->where('id',$val['id'])->update($data);
@@ -290,7 +310,7 @@ class Login extends Controller
     }
 
       /*获取access_token,不能用于获取用户信息的token*/
-  public  function getAccessToken()
+    public  function getAccessToken()
     {
         $appid = 'wx491d0319de706ff1';  //企业appid
         $secret = '6d82af90c4ab30acc08aa588a7f951dc';  //企业secret

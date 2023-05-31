@@ -14,10 +14,41 @@ use think\facade\Session;
 use think\facade\Request;
 use think\facade\validate; 
 use PHPZxing\PHPZxingDecoder;
-        
+
+use Picqer\Barcode\BarcodeGeneratorDataMatrix;
 
 class Index
 {
+    
+    public function role(){
+        $list = Db::name('users')->where('id','>',1)->select();
+        
+        $role_id = '';
+        foreach ($list as $key => $val){
+            $juese = Db::name('ceshi')->where('username',$val['username'])->find();
+            if($juese['juese'] == '职员'){
+                $role_id = 1;
+            }else if($juese['juese'] == '职工'){
+                $role_id = 2;
+            }else if($juese['juese'] == '工人'){
+                $role_id = 3;
+            }else{
+                $role_id = '';
+            }
+            $list[$key]['role_id'] = $role_id;
+            $data['role_id'] = $role_id;
+            Db::name('users')->where('id',$val['id'])->update($data);
+        }
+        
+        print_r($list);
+        die;
+    }
+    public function fields(){
+        $modle = model('Ruzhi');
+        $fields = $modle->getTableFields();
+        print_r($fields);
+        die;
+    }
     public function cate(){
         $list = Db::name('cate')->order('id asc')->select();
         
@@ -519,8 +550,8 @@ class Index
             $whra['qid'] = $info['id'];
             $whra['status'] = 2;
             $uuid= Db::name('test')->field('uid')->where($whra)->buildSql(true);
-
-            $tlist = Db::name('users')->field('id')->where('is_delete',1)->where('id','exp','not In '.$uuid)->select();
+            
+            $tlist = Db::name('users')->field('id')->where('is_delete',1)->where('is_kaohes',1)->where('id','exp','not In '.$uuid)->select();
 
             foreach ($tlist as $key => $val){
                 $whrb['qid'] = $info['id'];
@@ -655,8 +686,173 @@ class Index
                 $zcnum = Db::name('check_count')->where($wherenum)->sum('zcnum');
                 $cdnum = Db::name('check_count')->where($wherenum)->sum('cdnum');
                 $ztnum = Db::name('check_count')->where($wherenum)->sum('ztnum');
-                $cqnum = Db::name('check_count')->where($wherenum)->group('day')->count();
-                $qknum = $znum - $zcnum - $cdnum - $ztnum;
+                //$cqnum = Db::name('check_count')->where($wherenum)->group('day')->count();
+                $qknum = $num - $zcnum - $cdnum - $ztnum;
+                
+                //查询打卡结果
+                $checklist = array();
+                
+                $i = strtotime($start);
+                $o = strtotime($end);
+                $k = 0;
+            
+                //实际出勤天数
+                $shiji = 0;
+                
+                $classinfos = '';
+                
+                while($i <= $o)
+                {
+                    
+                    $checklog = '';
+                    $checklog2 = '';
+                    
+                    $starts = date('Y-m-d',$i);
+                    
+                    //查询班次
+                    $classlist = Db::name('check_count')
+                            ->where('day',$starts)
+                            ->where('uid',$val['uid'])
+                            ->select();
+                
+                    $one = 0;
+                    $two = 0;
+                    $three = 0;
+                    $four = 0;
+                    foreach($classlist as $keyz => $valz){
+                        $classinfoz = Db::name('classes')->field('title,commuting_num,one_in,one_out,two_in,two_out')->where('id',$valz['classesid'])->find();
+                        if($classinfoz['commuting_num'] == 1){
+                            $classinfos .= '「'.$starts.':'.$classinfoz['title'].' '.$classinfoz['one_in'].'~'.$classinfoz['one_out'].'」';
+                            
+                            $where1['riqi'] = $valz['day'];
+                            $where1['attendance_group_id'] = $valz['attendance_group_id'];
+                            $where1['classesid'] = $valz['classesid'];
+                            $where1['uid'] = $valz['uid'];
+                            $where1['check_num'] = 1;
+                            $one_in = Db::name('check_log')->field('shijian,status')->where($where1)->find();
+                            if($one_in){
+                                $checklog = $checklog.status($one_in['status'])."(".$one_in['shijian'].")";
+                                if($one_in['status'] != 4){
+                                    $one = 1;
+                                }
+                            }else{
+                                $checklog = $checklog."缺卡()";
+                            }
+                            
+                            $where2['riqi'] = $valz['day'];;
+                            $where2['attendance_group_id'] = $valz['attendance_group_id'];
+                            $where2['classesid'] = $valz['classesid'];
+                            $where2['uid'] = $valz['uid'];
+                            $where2['check_num'] = 2;
+                            $one_out = Db::name('check_log')->field('shijian,status')->where($where2)->find();
+                            if($one_out){
+                                $checklog = $checklog.status($one_out['status'])."(".$one_out['shijian'].")";
+                                if($one_out['status'] != 4){
+                                    $two = 1;
+                                }
+                            }else{
+                                $checklog = $checklog."缺卡()";
+                            }
+                            
+                            if($one == 1 && $two == 1){
+                                $shiji = $shiji + 1;
+                            }
+                        }else{
+                            $classinfos .= '「'.$starts.':'.$classinfoz['title'].' '.$classinfoz['one_in'].'~'.$classinfoz['one_out'].';'.$classinfoz['two_in'].'~'.$classinfoz['two_out'].'」';
+                            
+                            $where1['riqi'] = $valz['day'];;
+                            $where1['attendance_group_id'] = $valz['attendance_group_id'];
+                            $where1['classesid'] = $valz['classesid'];
+                            $where1['uid'] = $valz['uid'];
+                            $where1['check_num'] = 1;
+                            $one_in = Db::name('check_log')->field('shijian,status')->where($where1)->find();
+                            if($one_in){
+                                $checklog = $checklog.status($one_in['status'])."(".$one_in['shijian'].")";
+                                if($one_in['status'] != 4){
+                                    $one = 1;
+                                }
+                            }else{
+                                $checklog = $checklog."缺卡()";
+                            }
+                            
+                            $where2['riqi'] = $valz['day'];;
+                            $where2['attendance_group_id'] = $valz['attendance_group_id'];
+                            $where2['classesid'] = $valz['classesid'];
+                            $where2['uid'] = $valz['uid'];
+                            $where2['check_num'] = 2;
+                            $one_out = Db::name('check_log')->field('shijian,status')->where($where2)->find();
+                            if($one_out){
+                                $checklog = $checklog.status($one_out['status'])."(".$one_out['shijian'].")";
+                                if($one_out['status'] != 4){
+                                    $two = 1;
+                                }
+                            }else{
+                                $checklog = $checklog."缺卡()";
+                            }
+                            
+                            if($one == 1 && $two == 1){
+                                $shiji = $shiji + 0.5;
+                            }
+                            
+                            $where3['riqi'] = $valz['day'];;
+                            $where3['attendance_group_id'] = $valz['attendance_group_id'];
+                            $where3['classesid'] = $valz['classesid'];
+                            $where3['uid'] = $valz['uid'];
+                            $where3['check_num'] = 3;
+                            $two_in = Db::name('check_log')->field('shijian,status')->where($where3)->find();
+                            if($two_in){
+                                $checklog = $checklog.status($two_in['status'])."(".$two_in['shijian'].")";
+                                if($two_in['status'] != 4){
+                                    $three = 1;
+                                }
+                            }else{
+                                $checklog = $checklog."缺卡()";
+                            }
+                            
+                            $where4['riqi'] = $valz['day'];;
+                            $where4['attendance_group_id'] = $valz['attendance_group_id'];
+                            $where4['classesid'] = $valz['classesid'];
+                            $where4['uid'] = $valz['uid'];
+                            $where4['check_num'] = 4;
+                            $two_out = Db::name('check_log')->field('shijian,status')->where($where4)->find();
+                            if($two_out){
+                                $checklog = $checklog.status($two_out['status'])."(".$two_out['shijian'].")";
+                                if($two_out['status'] != 4){
+                                    $four = 1;
+                                }
+                            }else{
+                                $checklog = $checklog."缺卡()";
+                            }
+                            
+                            if($three == 1 && $four == 1){
+                                $shiji = $shiji + 0.5;
+                            }
+                        }
+                    }        
+                    
+                    $datasj[$k]['title'] = $starts;
+                    
+                    // $checklist[$k]['date'] = $starts;
+                    // if($classinfo['commuting_num'] == 1){
+                    //     $checklist[$k]['text'] = $checklog2;
+                    // }else{
+                    //     $checklist[$k]['text'] = $checklog;
+                    // }
+                    
+                    //$list[$key]['date'] = $starts;
+                    //if($classinfo['commuting_num'] == 1){
+                        //$list[$key][$starts] = $checklog2;
+                    //}else{
+                        
+                    //}
+                    $list[$key][$starts] = $checklog;
+                    
+                    $i = $i+86400;
+                    $k = $k + 1;
+                }
+                
+                $list[$key]['class'] = $classinfos;
+                
                 
                 //查询补卡记录
                 $wherebk = [];
@@ -753,7 +949,7 @@ class Index
                 //$data['qingjia_list'] = $qingjia_lists;
                 
                 $title = date('Y年m月',strtotime('-1 month')).'考勤如下';
-                $neirong = '打卡出勤 '.$cqnum.'天，迟到 '.$cdnum.'，早退 '.$ztnum.'，缺卡 '.$qknum.'，补卡'.$bknum.'，请假 '.$qjnum.'，加班'.$jbnum.'小时';
+                $neirong = "实际出勤".$shiji."天，迟到".$cdnum."次，早退".$ztnum."次，缺卡".$qknum."次，补卡".$bknum."次，请假".$qjnum."次，加班".$jbnum."小时";
                 
                 $shijian = date('Y-m',strtotime('-1 month'));
                 

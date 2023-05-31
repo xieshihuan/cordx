@@ -83,6 +83,8 @@ class Base extends Controller
                     'AttendanceGroup/select_name',
                     'AttendanceGroup/setmember',
                     'AttendanceGroup/organize_status',
+                    'AttendanceGroup/index',
+                    'Users/index',
                     
                 ];
         

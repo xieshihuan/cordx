@@ -63,7 +63,7 @@ class Export extends Controller
         }
         if(isset($startDate)&&$startDate!=""&&isset($endDate)&&$endDate!="")
         {
-            $endDate = date('Y-m-d',strtotime($endDate-'1day'));
+            $endDate = date('Y-m-d',strtotime($endDate));
             $where[] = ['day','between',[$startDate,$endDate]];
         }
         if(isset($startDate)&&$startDate==""&&isset($endDate)&&$endDate==""){
@@ -123,18 +123,11 @@ class Export extends Controller
                 ->select();
             $group_names = '';
             foreach ($clist as $keys => $vals){
-                $group_name = self::select_name($vals['catid']);
-                $arr = explode('/',$group_name);
-                $arrs = array_reverse($arr);
-                $group_list = implode('/',$arrs);
-                $group_list = ltrim($group_list,'/');
-                
-                $group_names = $group_names.' | '.$group_list;
-                
-                $group_list = ltrim($group_list,' | ');
+                $group_name = Db::name('cate')->where('id',$vals['catid'])->value('title');
+                $group_names = $group_names.' | '.$group_name;
             }
             //所属站点
-            $list[$key]['clist'] = $group_list;
+            $list[$key]['clist'] = ltrim($group_names,' | ');
             
             $list[$key]['attendance_group_name'] = Db::name('attendance_group')->where('id',$val['attendance_group_id'])->value('title');
             $list[$key]['mobile'] = $uinfo['mobile'];
@@ -566,10 +559,10 @@ class Export extends Controller
                     if($gjinfo){
                         $status_name = '国际出差';
                     }
-                    
-                        $list[$key]['two_out_time'] = '';
-                        $list[$key]['two_out_status'] = '缺卡';
-                        $list[$key]['two_out_status_name'] = $status_name;
+                
+                    $list[$key]['two_out_time'] = '';
+                    $list[$key]['two_out_status'] = '缺卡';
+                    $list[$key]['two_out_status_name'] = $status_name;
                     
                 }
             }
@@ -599,6 +592,7 @@ class Export extends Controller
                 }
             }
         }	
+        
         
         $fileName = '(每日统计 '.date("Y-m-d",time()) .'导出）';
         //实例化spreadsheet对象
@@ -765,8 +759,8 @@ class Export extends Controller
         //设置自动列宽
         $spreadsheet->getActiveSheet()->getColumnDimension('A')->setWidth(5);
         $spreadsheet->getActiveSheet()->getColumnDimension('B')->setWidth(10);
-        $spreadsheet->getActiveSheet()->getColumnDimension('C')->setWidth(15);
-        $spreadsheet->getActiveSheet()->getColumnDimension('D')->setWidth(50);
+        $spreadsheet->getActiveSheet()->getColumnDimension('C')->setWidth(25);
+        $spreadsheet->getActiveSheet()->getColumnDimension('D')->setWidth(15);
         $spreadsheet->getActiveSheet()->getColumnDimension('E')->setWidth(15);
         $spreadsheet->getActiveSheet()->getColumnDimension('F')->setWidth(15);
         $spreadsheet->getActiveSheet()->getColumnDimension('G')->setWidth(30);

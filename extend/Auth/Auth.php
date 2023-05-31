@@ -121,6 +121,7 @@ class Auth
                 $list[] = $auth;
             }
         }
+        
         if ($relation === 'or' && !empty($list)) {
             return true;
         }
@@ -158,6 +159,59 @@ class Auth
      * @return array       权限列表
      */
     protected function getAuthList($uid, $type)
+    {
+        static $_authList = [];
+        $t = implode(',', (array)$type);
+        if (isset($_authList[$uid.$t])) {
+            return $_authList[$uid.$t];
+        }
+        if ($this->_config['auth_type'] == 2 && Session::has('_AUTH_LIST_'.$uid.$t)) {
+            return Session::get('_AUTH_LIST_'.$uid.$t);
+        }
+        // 读取用户所属用户组
+        $groups = $this->getGroups($uid);
+        $ids = []; // 保存用户所属用户组设置的所有权限规则ID
+        
+        $admin_rule = Db::name('users')->where('id', $uid)->value('admin_rule');
+        
+        $ids = array_merge($ids, explode(',', trim($admin_rule, ',')));
+        
+        $ids = array_unique($ids);
+        if (empty($ids)) {
+            $_authList[$uid.$t] = [];
+            return [];
+        }
+        $map = [
+            ['id', 'in', $ids],
+            ['type', '=', $type],
+            ['status', '=', 1]
+        ];
+        // 读取用户组所有权限规则
+        $rules = Db::name($this->_config['auth_rule'])->where($map)->field('condition,name')->select();
+        // 循环规则，判断结果。
+        $authList = [];
+        foreach ($rules as $rule) {
+            if (!empty($rule['condition'])) { // 根据condition进行验证
+                $user = $this->getUserInfo($uid); // 获取用户信息,一维数组
+                $command = preg_replace('/\{(\w*?)\}/', '$user[\'\\1\']', $rule['condition']);
+                // dump($command); // debug
+                @(eval('$condition=('.$command.');'));
+                if ($condition) {
+                    $authList[] = strtolower($rule['name']);
+                }
+            } else {
+                // 只要存在就记录
+                $authList[] = strtolower($rule['name']);
+            }
+        }
+        $_authList[$uid.$t] = $authList;
+        if ($this->_config['auth_type'] == 2) {
+            Session::set('_AUTH_LIST_'.$uid.$t, $authList);
+        }
+        return array_unique($authList);
+    }
+    
+    protected function getAuthList_bf($uid, $type)
     {
         static $_authList = [];
         $t = implode(',', (array)$type);

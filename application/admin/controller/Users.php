@@ -29,6 +29,7 @@ class Users extends Base
         $groupId = Request::param('group_id');
         $did = Request::param('did');
         $aguid = Request::param('aguid');
+        $role_id = Request::param('role_id');
         //全局查询条件
         $where=[];
         if(!empty($keyword)){
@@ -95,9 +96,14 @@ class Users extends Base
             $where['agu.attendance_group_id'] = $aguid;
         }
         
+        if(!empty($role_id)){
+            $where['u.role_id'] = $role_id;
+        }
+        
         $where[]=['u.is_delete', '=', '1'];
        
         $where[]=['u.id', 'neq', 1];
+        
         
         //显示数量
         $pageSize = Request::param('page_size') ? Request::param('page_size') : config('page_size');
@@ -195,7 +201,9 @@ class Users extends Base
         $group_device = Request::param('group_device');
         $period = Request::param('period');
         $aguid = Request::param('attendance_group_id');
-
+        $role_id = Request::param('role_id');
+        $is_kaohes = Request::param('is_kaohes');
+        
         //全局查询条件
         $where=[];
         if(!empty($keyword)){
@@ -273,10 +281,16 @@ class Users extends Base
         if(!empty($group_device)){
             $where[]=['u.group_device', '=', $group_device];
         }
-        
         if(!empty($period)){
             $where[]=['u.period', '=', $period];
         }
+        if(!empty($role_id)){
+            $where[] = ['u.role_id','=',$role_id];
+        }
+        if(!empty($is_kaohes)){
+            $where[] = ['u.is_kaohes','=',$is_kaohes];
+        }
+        
         $members = array();
         if($did){
             $member = Db::name('daxuetang')
@@ -308,6 +322,7 @@ class Users extends Base
         
         $where[]=['u.id', 'neq', '1'];
         $where[]=['u.is_delete', 'eq', '1'];
+        
        
         //显示数量
         $pageSize = Request::param('page_size') ? Request::param('page_size') : config('page_size');
@@ -590,6 +605,8 @@ class Users extends Base
         		exit;
             }else{
                 
+                $data['mobile'] = trim($data['mobile']);
+                
                 //查询是否存在
                 $count = Db::name('users')->where('mobile',$data['mobile'])->where('is_delete',1)->count();
                 if($count > 0){
@@ -665,6 +682,8 @@ class Users extends Base
         		return json_encode($rs_arr,true);
         		exit;
             }else{
+                
+                $data['mobile'] = trim($data['mobile']);
                 
                 //查询是否存在
                 $count = Db::name('users')->where('id','neq',$data['id'])->where('mobile',$data['mobile'])->where('is_delete',1)->count();
@@ -893,10 +912,14 @@ class Users extends Base
             $rules = Db::name('users')
             ->where('id',Request::param('id'))
             ->value('period_ruless');
-        }else{
+        }elseif($type == 3){
             $rules = Db::name('users')
             ->where('id',Request::param('id'))
             ->value('train_ruless');
+        }else{
+            $rules = Db::name('users')
+            ->where('id',Request::param('id'))
+            ->value('check_ruless');
         }
             
         $list['zrules'] = $zrules;
@@ -962,9 +985,27 @@ class Users extends Base
                     die;
                 }
           
-            }else{
+            }elseif($type == 3){
                 $data['train_rules'] = $rules;
                 $data['train_ruless'] = $ruless;
+                $where['id'] = $id;
+                
+                if(M::update($data,$where)){
+                    $data_rt['status'] = 200;
+                    $data_rt['code'] = 200;
+                    $data_rt['msg'] = '站点配置成功';
+                    return json_encode($data_rt,true);
+                    die;
+                }else{
+                    $data_rt['status'] = 200;
+                    $data_rt['code'] = 201;
+                    $data_rt['msg'] = '保存错误';
+                    return json_encode($data_rt,true);
+                    die;
+                }
+            }else{
+                $data['check_rules'] = $rules;
+                $data['check_ruless'] = $ruless;
                 $where['id'] = $id;
                 
                 if(M::update($data,$where)){

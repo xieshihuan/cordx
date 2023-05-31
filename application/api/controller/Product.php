@@ -7,6 +7,8 @@
 namespace app\api\controller;
 use think\Db;
 use think\facade\Request;
+use think\facade\Env;
+use think\facade\validate;
 
 //实例化默认模型
 use app\common\model\Product as M;
@@ -732,10 +734,12 @@ class Product extends Base
         $zycount = seacharr_by_value($list2,'status',1);
         $xzcount = seacharr_by_value($list2,'status',2);
         $bfcount = seacharr_by_value($list2,'status',3);
+        $zengcount = seacharr_by_value($list2,'status',4);
         
         $data_rt['zycount'] = count($zycount);
         $data_rt['xzcount'] = count($xzcount);
         $data_rt['bfcount'] = count($bfcount);
+        $data_rt['zengcount'] = count($zengcount);
         
         $list1 = array_slice($list1,0,1000);
         $data_rt['djs_data'] = $list1;
@@ -844,10 +848,12 @@ class Product extends Base
         $zycount = seacharr_by_value($list,'status',1);
         $xzcount = seacharr_by_value($list,'status',2);
         $bfcount = seacharr_by_value($list,'status',3);
+        $zengcount = seacharr_by_value($list,'status',4);
         
         $data_rt['zycount'] = count($zycount);
         $data_rt['xzcount'] = count($xzcount);
         $data_rt['bfcount'] = count($bfcount);
+        $data_rt['zengcount'] = count($zengcount);
 
         $data_rt['total'] = count($list);
         $list = array_slice($list,$b,$pageSize);
@@ -943,6 +949,8 @@ class Product extends Base
             ->where($whereupd)
             ->count();
             
+        $pinfo['gift_info'] = Db::name('gift')->where($whr1)->find();
+        
         $rs_arr['status'] = 200;
         $rs_arr['msg'] = 'success';
         $rs_arr['data'] = $pinfo;
@@ -1893,5 +1901,175 @@ class Product extends Base
         return json_encode($rs_arr,true);
         exit;
         
+    }
+    
+    
+    public function gift(){
+        $data = Request::param();
+        
+        $data['operate_uid'] = $this->user_id;
+        $data['create_time'] = date('Y-m-d',time());
+        $data['update_time'] = date('Y-m-d',time());
+        $gift_id = Db::name('gift')->insertGetId($data);
+    
+        if($gift_id > 0){
+            $upd['status'] = 4;
+            $upd['gift_time'] = time();
+            $where['id'] = $data['product_id'];
+            Db::name('product')->where($where)->update($upd);
+            
+            $openid = Db::name('weixin')->where('uid',$data['confirm_uid'])->value('openid');
+            
+            if($openid){
+                $where1['id'] = $data['product_id'];
+                $pinfo = Db::name('product')->where($where1)->find();
+                
+                $product_type = Db::name('product_type')->where('id',$pinfo['type_id'])->value('title');
+                $group_name = Db::name('cate')->where('id',$data['group_id'])->value('title');
+                $operate_name = Db::name('users')->where('id',$data['operate_uid'])->value('username');
+                if($data['leixing'] == 1){
+                    $leixing_name = '赠与组织内部人员';
+                }else{
+                    $leixing_name = '赠与外部公司/人员';
+                }
+                
+                // if($data['reason_type'] == 1){
+                //     $reason_type_name = '人员离职';
+                // }else if($data['reason_type'] == 2){
+                //     $reason_type_name = '项目运营';
+                // }else if($data['reason_type'] == 3){
+                //     $reason_type_name = '人际往来';
+                // }else if($data['reason_type'] == 4){
+                //     $reason_type_name = '慈善捐助';
+                // }else{
+                //     $reason_type_name = '其他';
+                // }
+        
+                 //所有字段都可为空---审批拒绝
+                //$dataq['uname'] = '';
+                $dataq['neirong'] = $operate_name.'将'.$product_type.$leixing_name.$data['username'];
+                $dataq['shijian'] = date('Y-m-d H:i:s',time());
+                $dataq['openid'] = $openid;
+                //$dataq['type'] = 0;
+                Db::name('wxnotice')->insert($dataq);
+                
+                $dataq['product_id'] = $data['product_id'];
+                $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                $url=$http_type.$_SERVER['HTTP_HOST']."/api/wxnofiy/gift_notice";
+                http_curl($url,'post','json',$dataq);
+            }
+            
+        }
+        
+        $rs_arr['status'] = 200;
+        $rs_arr['msg'] = 'success';
+        return json_encode($rs_arr,true);
+        exit;
+    }
+    
+    public function gift_detail(){
+        $id = Request::param('id');
+        
+        $info = Db::name('gift')->where('id',$id)->find();
+        $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+        if($info['leixing'] == 1){
+            $info['leixing_name'] = '赠与组织内部人员';
+        }else{
+            $info['leixing_name'] = '赠与外部公司/人员';
+        }
+        
+        if($info['reason_type'] == 1){
+            $info['reason_type_name'] = '人员离职';
+        }else if($info['reason_type'] == 2){
+            $info['reason_type_name'] = '项目运营';
+        }else if($info['reason_type'] == 3){
+            $info['reason_type_name'] = '人际往来';
+        }else if($info['reason_type'] == 4){
+            $info['reason_type_name'] = '慈善捐助';
+        }else{
+            $info['reason_type_name'] = '其他';
+        }
+        
+        $info['confirm_username'] = Db::name('users')->where('id',$info['confirm_uid'])->value('username');
+        if(!empty($info['image'])){
+            $photo_list = Db::name('product_image')->where('id','in',$info['image'])->select();
+            foreach ($photo_list as $keys => $vals){
+                $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                $photo_list[$keys]['url'] = $http_type.$_SERVER['HTTP_HOST'].$vals['url'];
+            }
+            $info['image_list'] = $photo_list;
+        }
+            
+        $rs_arr['status'] = 200;
+        $rs_arr['msg'] = 'success';
+        $rs_arr['data'] = $info;
+        return json_encode($rs_arr,true);
+        exit;
+    }
+    
+    //上传文件
+    public function uploads(){
+        if(Request::isPost()) {
+            $time = Request::param('time');
+            $unionid = Request::param('unionid');
+            //file是传文件的名称，这是webloader插件固定写入的。因为webloader插件会写入一个隐藏input，不信你们可以通过浏览器检查页面
+            $file = request()->file('files');
+            
+            $info = $file->validate(['ext' => 'jpg,png,jpeg'])->move('uploads/product_gift');
+            
+            $Type = $info->getExtension();
+            
+            $url =  "/uploads/product_gift/".$info->getSaveName();
+            $url = str_replace("\\","/",$url);
+           
+            $data['uid'] = $this->user_id;
+            $data['url'] = $url;
+            $data['sort'] = 1;
+            $data['time'] = $time;
+            $data['unionid'] = $unionid;
+            
+            Db::name('product_image')->insert($data);
+         
+            $photo_list = Db::name('product_image')->where('uid',$this->user_id)->where('unionid',$unionid)->select();
+            foreach ($photo_list as $key => $val){
+                $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                $photo_list[$key]['url'] = $http_type.$_SERVER['HTTP_HOST'].$val['url'];
+            }
+            
+            $rs_arr['status'] = 200;
+            $rs_arr['msg'] = '提交成功';
+            $rs_arr['data'] = $photo_list;
+            return json_encode($rs_arr,true);
+            exit;
+            
+        }
+    }
+    //删除图片
+    public function uploads_del(){
+        if(Request::isPost()) {
+            $id = Request::post('id');
+            if(empty($id)){
+                $rs_arr['status'] = 500;
+        		$rs_arr['msg'] = 'ID不存在';
+        		return json_encode($rs_arr,true);
+        		exit;
+            }
+            
+            $whr['id'] = $id;
+            $path = Db::name('product_image')->where($whr)->value('url');
+            
+            $paths = Env::get('root_path').'public'.$path;
+         
+            if (file_exists($paths)) {
+                @unlink($paths);//删除
+            }
+            
+            Db::name('product_image')->where($whr)->delete();
+            
+            $rs_arr['status'] = 200;
+	        $rs_arr['msg'] ='success';
+    		return json_encode($rs_arr,true);
+    		exit;
+        }
     }
 }

@@ -7,11 +7,78 @@ use think\facade\Env;
 class Flow extends Base
 {
     
+    //获取年假
+    public function nianjia(){
+
+        $uinfo = Db::name('users')->where('id',$this->user_id)->find();
+        
+        $day = 0;
+        if($uinfo['level']){
+            //查询总天数
+            if($uinfo['level'] == '0级'){
+                $day = 0;
+            }else if($uinfo['level'] == '1级'){
+                $day = 1;
+            }else if($uinfo['level'] == '2级'){
+                $day = 2;
+            }else if($uinfo['level'] == '3级'){
+                $day = 3;
+            }else if($uinfo['level'] == '4级'){
+                $day = 4;
+            }else if($uinfo['level'] == '5级'){
+                $day = 5;
+            }else if($uinfo['level'] == '一级工' || $uinfo['level'] == '二级工' || $uinfo['level'] == '三级工'){
+                $day = 0;
+            }else{
+                $day = 5;
+            }
+            //查询已用天数
+            $whr = [];
+            $whr[] = ['nj.uid','=',$this->user_id];
+            $whr[] = ['fl.flow_type','=','nianjia'];
+            $whr[] = ['fl.status','<',3];
+            
+            $shichang = Db::name('nianjia')    
+            ->alias('nj')
+            ->leftJoin('flow_list fl','nj.id = fl.flow_id')
+            ->field('nj.*,fl.status')
+            ->where($whr)
+            ->sum('shichang');
+            
+            $sheng_time = $day - $shichang;
+            
+           
+        }else{
+            $day = 0;
+            $sheng_time = 0;
+        }
+        $list['level'] = $uinfo['level'];
+        $list['zongji'] = $day;
+        $list['shengyu'] = $sheng_time;
+            
+        $data_rt['status'] = 200;
+        $data_rt['msg'] = 'success';
+        $data_rt['data'] = $list;
+        return json_encode($data_rt);
+        exit;
+
+    }
+    //获取考勤组
+    public function attendance(){
+
+        $list = Db::name('attendance_group')->field('id,title as text')->where('is_delete',1)->select();
+
+        $data_rt['status'] = 200;
+        $data_rt['msg'] = 'success';
+        $data_rt['data'] = $list;
+        return json_encode($data_rt);
+        exit;
+
+    }
     //获取架构
     public function jiagou(){
 
         $parentid = input('parentid');
-  
         $where=[];
         if($parentid){
             $where[]=['parentid', '=', $parentid];
@@ -43,6 +110,41 @@ class Flow extends Base
         return json_encode($data_rt);
         exit;
 
+    }
+    
+    //获取站点下人员
+    public function getuser(){
+        $catid = Request::param('catid');
+        $uid = Request::param('uid');
+        $where=[];
+        if(!empty($catid)){
+            $where[]=['catid', '=', $catid];
+        }
+        if(!empty($uid)){
+            $where[]=['uid', 'not in', $uid];
+        }
+        
+        $list = Db::name('cateuser')->field('id,uid')->where($where)->select();
+        
+        foreach ($list as $key => $val){
+            $list[$key]['username'] = Db::name('users')->where('id',$val['uid'])->value('username');
+        }
+
+        $data_rt['status'] = 200;
+        $data_rt['msg'] = 'success';
+        $data_rt['data'] = $list;
+        return json_encode($data_rt);
+        exit;
+    }
+    
+    public function getweek(){
+        $riqi = Request::param('riqi');
+        
+        $data_rt['status'] = 200;
+        $data_rt['msg'] = 'success';
+        $data_rt['data'] = date('W',strtotime($riqi));
+        return json_encode($data_rt);
+        exit;
     }
     
     
@@ -190,7 +292,7 @@ class Flow extends Base
     
         $whr = [];
         $whr[] = ['status','=',1];
-        $list = Db::name('flow_cate')->where($whr)->select();
+        $list = Db::name('flow_cate')->where($whr)->order('sort asc')->select();
         
         if($list){
             echo apireturn(200,'success',$list);die;
@@ -204,6 +306,68 @@ class Flow extends Base
         }
         
     }
+    
+    
+    //获取审批流(条件)
+    public function get_flows(){
+        $data = $this->request->param();
+        $flow_type = $data['flow_type'];
+        if(empty($flow_type)){
+            echo apireturn(201,'请选择审批类别','');
+            die;
+        }else{
+            
+            $whr = [];
+            $whr[] = ['flow_type','=',$flow_type];
+            $whr[] = ['status','=',1];
+            $id = Db::name('flow_cate')->where($whr)->value('id');
+            
+            if(empty($id)){
+                echo apireturn(201,'审批类别不存在','');
+                die;
+            }
+            
+            $start = Db::name('flow')->where('cate_id',$id)->where('parent_id',0)->order('sort asc')->find();
+            
+            $cate = Db::name('flow')->where('cate_id',$id)->order('sort asc')->select();
+            
+            $list = getFlow($cate,$start['id'],$data);
+            
+            foreach ($list as $key => $val){
+                
+                if($flow_type == 'qingjia' && $val['flow_leixing'] == 3 && $leixing == 1){
+                    $list[$key]['flow_uid'] = '';
+                    $list[$key]['flow_user'] = array();
+                    $list[$key]['is_disable'] = 0;
+                }else if($flow_type == 'qingjia' && $val['flow_leixing'] == 3 && $leixing == 5){
+                    $list[$key]['flow_uid'] = '';
+                    $list[$key]['flow_user'] = array();
+                    $list[$key]['is_disable'] = 0;
+                }else{
+                    $list[$key]['flow_user'] = Db::name('users')->field('id,username')->where('id','in',$val['flow_uid'])->select();
+                    if($val['flow_uid'] != ''){
+                        $list[$key]['is_disable'] = 1;
+                    }else{
+                        $list[$key]['is_disable'] = 0;
+                    }
+                }
+            }
+                
+            if($list){
+                echo apireturn(200,'success',$list);die;
+            }else{
+                $list = array();
+                $data_rt['status'] = 200;
+                $data_rt['msg'] = 'success';
+                $data_rt['data'] = $list;
+                return json_encode($data_rt);
+                exit;
+            }
+            
+        }
+    }
+    
+    
     
     //获取审批流
     public function get_flow(){
@@ -279,31 +443,90 @@ class Flow extends Base
             $name = $data['flow_type'];
             unset($data['flow_type']);
             $uid = $data['uid'];
-            
             $uids = explode(',',$uid);
+            
+            // if(Db::name($name)->where($data)->count() > 0){
+            //     echo apireturn(201,'请勿重复提交','');
+            //     die;
+            // }
+            
+            if($name == 'ruzhi'){
+                if(Db::name('users')->where('mobile',$data['mobile'])->where('is_delete',1)->count() > 0){
+                    echo apireturn(201,'该手机号已被申请注册','');
+                    die;
+                }else{
+                    if(Db::name($name)->where('mobile',$data['mobile'])->count() > 0){
+                        echo apireturn(201,'该手机号已被申请注册','');
+                        die;
+                    }
+                }
+            }
+            
+            $username = '';
+            foreach ($uids as $k => $v){
+                if($name == 'zhoukoutou'){
+                    
+                    $whr = [];
+                    $whr[] = ['z.uid','=',$v];
+                    $whr[] = ['z.zhouci','=',$data['zhouci']];
+                    $whr[] = ['fl.flow_type','=','zhoukoutou'];
+                    $whr[] = ['fl.status','<',3];
+                    
+                    $count = Db::name($name)    
+                    ->alias('z')
+                    ->leftJoin('flow_list fl','z.id = fl.flow_id')
+                    ->field('z.*,fl.status')
+                    ->where($whr)
+                    ->count();
+                    
+                    if($count > 0){
+                        $username .= Db::name('users')->where('id',$v)->value('username').',';
+                    }
+                }else if($name == 'canhui'){
+                    
+                    $whr2 = [];
+                    $whr2[] = ['z.uid','=',$v];
+                    $whr2[] = ['z.zhouci','=',$data['zhouci']];
+                    $whr2[] = ['fl.flow_type','=','canhui'];
+                    $whr2[] = ['fl.status','<',3];
+                    
+                    $count2 = Db::name($name)    
+                    ->alias('z')
+                    ->leftJoin('flow_list fl','z.id = fl.flow_id')
+                    ->field('z.*,fl.status')
+                    ->where($whr2)
+                    ->count();
+                    
+                    if($count2 > 0){
+                        $username .= Db::name('users')->where('id',$v)->value('username').',';
+                    }
+                }
+            }
+            $username = rtrim($username,',');
+            if(!empty($username)){
+                echo apireturn(201,$username.'已提交,请勿重复提交','');
+                die;
+            }
             
             $parentid = date('YmdHis').randString();
             
-            foreach ($uids as $k => $v){
+            foreach ($uids as $ks => $vs){
                 
-                $data['uid'] = $v;
+                $data['uid'] = $vs;
+                //获取补卡表返回的id
+                $id = Db::name($name)->insertGetId($data);
                 
-                if(Db::name($name)->where($data)->count() == 0){
-                    //获取补卡表返回的id
-                    $id = Db::name($name)->insertGetId($data);
-                    
-                    $unionid = date('YmdHis').randString();
-                    $dataz['parentid'] = $parentid;
-                    $dataz['unionid'] = $unionid;
-                    $dataz['flow_type'] = $name;
-                    $dataz['flow_id'] = $id;
-                    $dataz['uid'] = $this->user_id;
-                    $dataz['shenqing_uid'] = $v;
-                    $dataz['status'] = 1;
-                    $dataz['create_time'] = time();
-                    $dataz['update_time'] = time();
-                    Db::name('flow_list')->insert($dataz);
-                }
+                $unionid = date('YmdHis').randString();
+                $dataz['parentid'] = $parentid;
+                $dataz['unionid'] = $unionid;
+                $dataz['flow_type'] = $name;
+                $dataz['flow_id'] = $id;
+                $dataz['uid'] = $this->user_id;
+                $dataz['shenqing_uid'] = $vs;
+                $dataz['status'] = 1;
+                $dataz['create_time'] = time();
+                $dataz['update_time'] = time();
+                Db::name('flow_list')->insert($dataz);
                 
             }
             
@@ -569,6 +792,127 @@ class Flow extends Base
                 $list[$key]['four'] = $info['end'].' '.$end_name;
                 
                 $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'zhoukoutou'){
+                $info = Db::name($val['flow_type'])->field('uid,zhouci,renshu,group_id,create_time')->where('id',$val['flow_id'])->find();
+                
+                $list[$key]['one'] = Db::name('users')->where('id',$info['uid'])->value('username');
+          
+                $list[$key]['two'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                
+                $list[$key]['three'] = $info['zhouci'];
+                $list[$key]['four'] = $info['renshu'];
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'canhui'){
+                $info = Db::name($val['flow_type'])->field('uid,zhouci,is_kaohe,group_id,create_time')->where('id',$val['flow_id'])->find();
+                
+                $list[$key]['one'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+          
+                $list[$key]['two'] = $info['zhouci'];
+                
+                $list[$key]['three'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                if($info['is_kaohe'] == 1){
+                    $is_kaohe = '是';
+                }else{
+                    $is_kaohe = '否';
+                }
+                $list[$key]['four'] = $is_kaohe;
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'lizhi'){
+                $info = Db::name($val['flow_type'])->field('uid,lizhiriqi,reason,group_id,create_time')->where('id',$val['flow_id'])->find();
+                $list[$key]['one'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                
+                $list[$key]['two'] = Db::name('cate')->where('id',$info['group_id'])->value('title');;
+                
+                $list[$key]['three'] = $info['lizhiriqi'];
+                
+                $list[$key]['four'] = $info['reason'];;
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'zhuangang'){
+                $info = Db::name($val['flow_type'])->field('uid,reason,group_id,to_group_id,create_time')->where('id',$val['flow_id'])->find();
+                $list[$key]['one'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                
+                $list[$key]['two'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                
+                $list[$key]['three'] = Db::name('cate')->where('id',$info['to_group_id'])->value('title');
+                
+                $list[$key]['four'] = $info['reason'];;
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'ruzhi'){
+                $info = Db::name($val['flow_type'])->field('uid,username,group_id,gangwei,is_tongguo,create_time')->where('id',$val['flow_id'])->find();
+                $list[$key]['one'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                
+                $list[$key]['two'] = $info['username'];
+                
+                $list[$key]['three'] = Db::name('cate')->where('id',$info['group_id'])->value('title').'-'.$info['gangwei'];
+                
+                if($info['is_tongguo'] == 1){
+                    $is_tongguo = '是';
+                }else{
+                    $is_tongguo = '否';
+                }
+                $list[$key]['four'] = $is_tongguo;
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'sbsqd'){
+                $info = Db::name($val['flow_type'])->field('uid,group_id,huji_address,is_beijing,create_time')->where('id',$val['flow_id'])->find();
+                
+                $list[$key]['one'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                
+                $list[$key]['two'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                
+                if($info['huji_address'] == 1){
+                    $huji = '本市';
+                }else{
+                    $huji = '外地';
+                }
+                
+                $list[$key]['three'] = $huji;
+                
+                if($info['is_beijing'] == 1){
+                    $is_beijing = '是';
+                }else{
+                    $is_beijing = '否';
+                }
+                $list[$key]['four'] = $is_beijing;
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'zhuanzhengjinji'){
+                $info = Db::name($val['flow_type'])->field('uid,group_id,ruzhiriqi,old_jibie,sub_jibie,create_time')->where('id',$val['flow_id'])->find();
+                
+                $list[$key]['one'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                
+                $list[$key]['two'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                
+                $list[$key]['three'] = $info['old_jibie'];
+                
+                $list[$key]['four'] = $info['sub_jibie'];
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'nianjia'){
+                $info = Db::name($val['flow_type'])->field('uid,group_id,shichang,start,end,start_type,end_type')->where('id',$val['flow_id'])->find();
+                
+                $list[$key]['one'] = Db::name('users')->where('id',$info['uid'])->value('username');
+          
+                $list[$key]['two'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                
+                if($info['start_type'] == 1){
+                    $start_name = '上午';
+                }else{
+                    $start_name = '下午';
+                }
+                if($info['end_type'] == 1){
+                    $end_name = '上午';
+                }else{
+                    $end_name = '下午';
+                }
+                $list[$key]['three'] = $info['start'].' '.$start_name.'至'.$info['end'].' '.$end_name;
+                $list[$key]['four'] = $info['shichang'];
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
             }
         }
         
@@ -797,7 +1141,169 @@ class Flow extends Base
                 $list[$key]['four'] = $info['end'].' '.$end_name;
                 
                 $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'zhoukoutou'){
+                $info = Db::name($val['flow_type'])->field('uid,zhouci,renshu,group_id,create_time')->where('id',$val['flow_id'])->find();
+                
+                $list[$key]['title'] = '周口头';
+                
+                $flow_ids= Db::name('flow_list')->field('flow_id')->where('parentid',$val['parentid'])->buildSql(true);
+                $uids= Db::name($val['flow_type'])->field('uid')->where('id','exp','In '.$flow_ids)->buildSql(true);
+                
+                $ulist = Db::name('users')->field('username')->where('id','exp','In '.$uids)->select();
+                $uname = '';
+                foreach ($ulist as $k => $v){
+                    $uname .= $v['username'].',';
+                }
+                $uname = rtrim($uname,',');
+                $list[$key]['one'] = $uname;
+                
+                $list[$key]['two'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                
+                $list[$key]['three'] = $info['zhouci'];
+                $list[$key]['four'] = $info['renshu'];
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'canhui'){
+                $info = Db::name($val['flow_type'])->field('uid,zhouci,is_kaohe,group_id,create_time')->where('id',$val['flow_id'])->find();
+                
+                $list[$key]['title'] = '库尔大学堂参会情况统计单';
+                
+                $flow_ids= Db::name('flow_list')->field('flow_id')->where('parentid',$val['parentid'])->buildSql(true);
+                $uids= Db::name($val['flow_type'])->field('uid')->where('id','exp','In '.$flow_ids)->buildSql(true);
+                
+                $ulist = Db::name('users')->field('username')->where('id','exp','In '.$uids)->select();
+                $uname = '';
+                foreach ($ulist as $k => $v){
+                    $uname .= $v['username'].',';
+                }
+                $uname = rtrim($uname,',');
+                $list[$key]['one'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                
+                $list[$key]['two'] = $info['zhouci'];
+                
+                $list[$key]['three'] = $uname;
+                
+                if($info['is_kaohe'] == 1){
+                    $is_kaohe = '是';
+                }else{
+                    $is_kaohe = '否';
+                }
+                
+                $list[$key]['four'] = $is_kaohe;
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'lizhi'){
+                $info = Db::name($val['flow_type'])->field('uid,lizhiriqi,reason,group_id,create_time')->where('id',$val['flow_id'])->find();
+                
+                $list[$key]['title'] = '离职';
+                
+                $list[$key]['one'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                
+                $list[$key]['two'] = Db::name('cate')->where('id',$info['group_id'])->value('title');;
+                
+                $list[$key]['three'] = $info['lizhiriqi'];
+                
+                $list[$key]['four'] = $info['reason'];;
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'zhuangang'){
+                $info = Db::name($val['flow_type'])->field('uid,reason,group_id,to_group_id,create_time')->where('id',$val['flow_id'])->find();
+                
+                $list[$key]['title'] = '转岗';
+                
+                $list[$key]['one'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                
+                $list[$key]['two'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                
+                $list[$key]['three'] = Db::name('cate')->where('id',$info['to_group_id'])->value('title');
+                
+                $list[$key]['four'] = $info['reason'];;
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'ruzhi'){
+                $info = Db::name($val['flow_type'])->field('uid,username,group_id,gangwei,is_tongguo,create_time')->where('id',$val['flow_id'])->find();
+                
+                $list[$key]['title'] = '入职';
+            
+                $list[$key]['one'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                
+                $list[$key]['two'] = $info['username'];
+                
+                $list[$key]['three'] = Db::name('cate')->where('id',$info['group_id'])->value('title').'-'.$info['gangwei'];
+                
+                if($info['is_tongguo'] == 1){
+                    $is_tongguo = '是';
+                }else{
+                    $is_tongguo = '否';
+                }
+                $list[$key]['four'] = $is_tongguo;
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'sbsqd'){
+                $info = Db::name($val['flow_type'])->field('uid,group_id,huji_address,is_beijing,create_time')->where('id',$val['flow_id'])->find();
+                
+                $list[$key]['title'] = '社保申请单';
+                
+                $list[$key]['one'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                
+                $list[$key]['two'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                
+                if($info['huji_address'] == 1){
+                    $huji = '本市';
+                }else{
+                    $huji = '外地';
+                }
+                
+                $list[$key]['three'] = $huji;
+                
+                if($info['is_beijing'] == 1){
+                    $is_beijing = '是';
+                }else{
+                    $is_beijing = '否';
+                }
+                $list[$key]['four'] = $is_beijing;
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'zhuanzhengjinji'){
+                $info = Db::name($val['flow_type'])->field('uid,group_id,ruzhiriqi,old_jibie,sub_jibie,create_time')->where('id',$val['flow_id'])->find();
+                
+                $list[$key]['title'] = '转正晋级审批';
+                
+                $list[$key]['one'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                
+                $list[$key]['two'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                
+                $list[$key]['three'] = $info['old_jibie'];
+                
+                $list[$key]['four'] = $info['sub_jibie'];
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
+            }else if($val['flow_type'] == 'nianjia'){
+                $info = Db::name($val['flow_type'])->field('uid,group_id,shichang,start,end,start_type,end_type')->where('id',$val['flow_id'])->find();
+                
+                $list[$key]['title'] = '夏季年假';
+                
+                $list[$key]['one'] = Db::name('users')->where('id',$info['uid'])->value('username');
+          
+                $list[$key]['two'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                
+                if($info['start_type'] == 1){
+                    $start_name = '上午';
+                }else{
+                    $start_name = '下午';
+                }
+                if($info['end_type'] == 1){
+                    $end_name = '上午';
+                }else{
+                    $end_name = '下午';
+                }
+                $list[$key]['three'] = $info['start'].' '.$start_name.'至'.$info['end'].' '.$end_name;
+                $list[$key]['four'] = $info['shichang'];
+                
+                $list[$key]['submit_time'] = date('m-d H:i',$val['create_time']);
             }
+            
+            
         }
         
         $data_rt['total'] = count($list);
@@ -1009,8 +1515,200 @@ class Flow extends Base
                 }
                 $info['image_list'] = $photo_list;
             }
+        }else if($flowinfo['flow_type'] == 'zhoukoutou'){
+            $info = Db::name($flowinfo['flow_type'])->where('id',$flowinfo['flow_id'])->find();
+            
+            $info['submit_time'] = date('Y-m-d H:i',$flowinfo['create_time']);
+            $flow_ids= Db::name('flow_list')->field('flow_id')->where('parentid',$flowinfo['parentid'])->buildSql(true);
+            $uids= Db::name($flowinfo['flow_type'])->field('uid')->where('id','exp','In '.$flow_ids)->buildSql(true);
+            
+            $ulist = Db::name('users')->field('username')->where('id','exp','In '.$uids)->select();
+            $uname = '';
+            foreach ($ulist as $k => $v){
+                $uname .= $v['username'].',';
+            }
+            $uname = rtrim($uname,',');
+            $info['username'] = $uname;
+            $info['usernames'] = Db::name('users')->where('id',$this->user_id)->value('username');
+            $info['mobile'] = Db::name('users')->where('id',$info['uid'])->value('mobile');
+            $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+            
+        }else if($flowinfo['flow_type'] == 'canhui'){
+            $info = Db::name($flowinfo['flow_type'])->where('id',$flowinfo['flow_id'])->find();
+            
+            $info['submit_time'] = date('Y-m-d H:i',$flowinfo['create_time']);
+            $flow_ids= Db::name('flow_list')->field('flow_id')->where('parentid',$flowinfo['parentid'])->buildSql(true);
+            $uids= Db::name($flowinfo['flow_type'])->field('uid')->where('id','exp','In '.$flow_ids)->buildSql(true);
+            
+            $ulist = Db::name('users')->field('username')->where('id','exp','In '.$uids)->select();
+            $uname = '';
+            foreach ($ulist as $k => $v){
+                $uname .= $v['username'].',';
+            }
+            $uname = rtrim($uname,',');
+            $info['username'] = $uname;
+            $info['usernames'] = Db::name('users')->where('id',$this->user_id)->value('username');
+            $info['mobile'] = Db::name('users')->where('id',$info['uid'])->value('mobile');
+            $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+            
+            if(!empty($info['image'])){
+                $photo_list = Db::name('flow_image')->where('id','in',$info['image'])->select();
+                foreach ($photo_list as $keys => $vals){
+                    $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                    $photo_list[$keys]['url'] = $http_type.$_SERVER['HTTP_HOST'].$vals['url'];
+                }
+                $info['image_list'] = $photo_list;
+            }
+        }else if($flowinfo['flow_type'] == 'lizhi'){
+            $info = Db::name($flowinfo['flow_type'])->where('id',$flowinfo['flow_id'])->find();
+            
+            $info['submit_time'] = date('Y-m-d H:i',$flowinfo['create_time']);
+            $flow_ids= Db::name('flow_list')->field('flow_id')->where('parentid',$flowinfo['parentid'])->buildSql(true);
+            $uids= Db::name($flowinfo['flow_type'])->field('uid')->where('id','exp','In '.$flow_ids)->buildSql(true);
+            
+            $ulist = Db::name('users')->field('username')->where('id','exp','In '.$uids)->select();
+            $uname = '';
+            foreach ($ulist as $k => $v){
+                $uname .= $v['username'].',';
+            }
+            $uname = rtrim($uname,',');
+            $info['username'] = $uname;
+            $info['usernames'] = Db::name('users')->where('id',$this->user_id)->value('username');
+            $info['mobile'] = Db::name('users')->where('id',$info['uid'])->value('mobile');
+            $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+            
+            if(!empty($info['image'])){
+                $photo_list = Db::name('flow_image')->where('id','in',$info['image'])->select();
+                foreach ($photo_list as $keys => $vals){
+                    $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                    $photo_list[$keys]['url'] = $http_type.$_SERVER['HTTP_HOST'].$vals['url'];
+                }
+                $info['image_list'] = $photo_list;
+            }
+        }else if($flowinfo['flow_type'] == 'zhuangang'){
+            $info = Db::name($flowinfo['flow_type'])->where('id',$flowinfo['flow_id'])->find();
+            
+            $info['submit_time'] = date('Y-m-d H:i',$flowinfo['create_time']);
+            $flow_ids= Db::name('flow_list')->field('flow_id')->where('parentid',$flowinfo['parentid'])->buildSql(true);
+            $uids= Db::name($flowinfo['flow_type'])->field('uid')->where('id','exp','In '.$flow_ids)->buildSql(true);
+            
+            $ulist = Db::name('users')->field('username')->where('id','exp','In '.$uids)->select();
+            $uname = '';
+            foreach ($ulist as $k => $v){
+                $uname .= $v['username'].',';
+            }
+            $uname = rtrim($uname,',');
+            $info['username'] = $uname;
+            $info['usernames'] = Db::name('users')->where('id',$this->user_id)->value('username');
+            $info['mobile'] = Db::name('users')->where('id',$info['uid'])->value('mobile');
+            $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+            $info['to_group_name'] = Db::name('cate')->where('id',$info['to_group_id'])->value('title');
+        }else if($flowinfo['flow_type'] == 'ruzhi'){
+            $info = Db::name($flowinfo['flow_type'])->where('id',$flowinfo['flow_id'])->find();
+            
+            $info['submit_time'] = date('Y-m-d H:i',$flowinfo['create_time']);
+            $flow_ids= Db::name('flow_list')->field('flow_id')->where('parentid',$flowinfo['parentid'])->buildSql(true);
+            $uids= Db::name($flowinfo['flow_type'])->field('uid')->where('id','exp','In '.$flow_ids)->buildSql(true);
+            
+            $ulist = Db::name('users')->field('username')->where('id','exp','In '.$uids)->select();
+            $uname = '';
+            foreach ($ulist as $k => $v){
+                $uname .= $v['username'].',';
+            }
+            $uname = rtrim($uname,',');
+            $info['tj_username'] = $uname;
+            $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+            $info['attendance_group_name'] = Db::name('attendance_group')->where('id',$info['attendance_group_id'])->value('title');
+        }else if($flowinfo['flow_type'] == 'sbsqd'){
+            $info = Db::name($flowinfo['flow_type'])->where('id',$flowinfo['flow_id'])->find();
+            
+            $info['submit_time'] = date('Y-m-d H:i',$flowinfo['create_time']);
+            $flow_ids= Db::name('flow_list')->field('flow_id')->where('parentid',$flowinfo['parentid'])->buildSql(true);
+            $uids= Db::name($flowinfo['flow_type'])->field('uid')->where('id','exp','In '.$flow_ids)->buildSql(true);
+            
+            $ulist = Db::name('users')->field('username')->where('id','exp','In '.$uids)->select();
+            $uname = '';
+            foreach ($ulist as $k => $v){
+                $uname .= $v['username'].',';
+            }
+            $uname = rtrim($uname,',');
+            $info['username'] = $uname;
+            $info['usernames'] = Db::name('users')->where('id',$this->user_id)->value('username');
+            
+            
+            $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+        }else if($flowinfo['flow_type'] == 'zhuanzhengjinji'){
+            $info = Db::name($flowinfo['flow_type'])->where('id',$flowinfo['flow_id'])->find();
+            
+            $info['submit_time'] = date('Y-m-d H:i',$flowinfo['create_time']);
+            $flow_ids= Db::name('flow_list')->field('flow_id')->where('parentid',$flowinfo['parentid'])->buildSql(true);
+            $uids= Db::name($flowinfo['flow_type'])->field('uid')->where('id','exp','In '.$flow_ids)->buildSql(true);
+            
+            $ulist = Db::name('users')->field('username')->where('id','exp','In '.$uids)->select();
+            $uname = '';
+            foreach ($ulist as $k => $v){
+                $uname .= $v['username'].',';
+            }
+            $uname = rtrim($uname,',');
+            $info['username'] = $uname;
+            $info['usernames'] = Db::name('users')->where('id',$this->user_id)->value('username');
+            $info['mobile'] = Db::name('users')->where('id',$info['uid'])->value('mobile');
+            $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+            
+            if(!empty($info['image'])){
+                $photo_list = Db::name('flow_image')->where('id','in',$info['image'])->select();
+                foreach ($photo_list as $keys => $vals){
+                    $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                    $photo_list[$keys]['url'] = $http_type.$_SERVER['HTTP_HOST'].$vals['url'];
+                }
+                $info['image_list'] = $photo_list;
+            }
+            if(!empty($info['qingdan'])){
+                $qingdan_list = Db::name('flow_image')->where('id','in',$info['qingdan'])->select();
+                foreach ($qingdan_list as $keys => $vals){
+                    $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                    $qingdan_list[$keys]['url'] = $http_type.$_SERVER['HTTP_HOST'].$vals['url'];
+                }
+                $info['qingdan_list'] = $qingdan_list;
+            }
+        }else if($flowinfo['flow_type'] == 'nianjia'){
+            $info = Db::name($flowinfo['flow_type'])->where('id',$flowinfo['flow_id'])->find();
+            if($info['start_type'] == 1){
+                $info['start_name'] = '上午';
+            }else{
+                $info['start_name'] = '下午';
+            }
+            if($info['end_type'] == 1){
+                $info['end_name'] = '上午';
+            }else{
+                $info['end_name'] = '下午';
+            }
+            
+            $info['submit_time'] = date('Y-m-d H:i',$flowinfo['create_time']);
+            $flow_ids= Db::name('flow_list')->field('flow_id')->where('parentid',$flowinfo['parentid'])->buildSql(true);
+            $uids= Db::name($flowinfo['flow_type'])->field('uid')->where('id','exp','In '.$flow_ids)->buildSql(true);
+            
+            $ulist = Db::name('users')->field('username')->where('id','exp','In '.$uids)->select();
+            $uname = '';
+            foreach ($ulist as $k => $v){
+                $uname .= $v['username'].',';
+            }
+            $uname = rtrim($uname,',');
+            $info['username'] = $uname;
+            $info['usernames'] = Db::name('users')->where('id',$this->user_id)->value('username');
+            $info['mobile'] = Db::name('users')->where('id',$info['uid'])->value('mobile');
+            $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+            
+            if(!empty($info['image'])){
+                $photo_list = Db::name('flow_image')->where('id','in',$info['image'])->select();
+                foreach ($photo_list as $keys => $vals){
+                    $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                    $photo_list[$keys]['url'] = $http_type.$_SERVER['HTTP_HOST'].$vals['url'];
+                }
+                $info['image_list'] = $photo_list;
+            }
         }
-        
+    
         $flowinfo['top'] = $info;
         
         //查询审批记录
@@ -1048,6 +1746,12 @@ class Flow extends Base
         }else{
             $flowinfo['is_quxiao'] = 0;
         }
+        //判断撤回按钮
+        if(Db::name('flow_list')->where('parentid',$data['parentid'])->where('status',2)->where('uid',$this->user_id)->count()>0){
+            $flowinfo['is_chehui'] = 1;
+        }else{
+            $flowinfo['is_chehui'] = 0;
+        }
         //判断再次发起按钮
         if(Db::name('flow_list')->where('parentid',$data['parentid'])->where('status','<>',1)->where('shenqing_uid',$this->user_id)->count()>0){
             $flowinfo['is_reapply'] = 1;
@@ -1083,6 +1787,215 @@ class Flow extends Base
         
     }
     
+    
+    public function chehui(){
+        $data = $this->request->param();
+        $whr['uid'] = $this->user_id;
+        $whr['parentid'] = $data['parentid'];
+        if(Db::name('flow_list')->where($whr)->value('status') == 2){
+            $data['status'] = 5;
+            if(Db::name('flow_list')->where($whr)->update($data)){
+                
+                $uname = '';
+                
+                $flows = Db::name('flow_list')->field('uid,flow_type,flow_id,create_time')->where('parentid',$data['parentid'])->find();
+                $info = Db::name($flows['flow_type'])->where('id',$flows['flow_id'])->find();
+            
+                if($flows['flow_type'] == 'jiaban'){
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = $info['start'].' 至 '.$info['end'];
+                    if($info['leixing'] == 1){
+                        $neirong .= '，「日常加班」申请';
+                    }else if($info['leixing'] == 2){
+                        $neirong .= '，「周六日加班」申请';
+                    }
+                    
+                    $shijian = date('m-d H:i',time());
+                }else if($flows['flow_type'] == 'buka'){
+                
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = $info['riqi'].' ';
+                    if($info['leixing'] == 2){
+                        $lxname = $info['shijian'].'，迟到';
+                    }else if($info['leixing'] == 3){
+                        $lxname = $info['shijian'].'，早退';
+                    }else if($info['leixing'] == 4){
+                        $lxname = $info['shijian'].'，缺卡';
+                    }
+                    $neirong .=  '补卡申请';
+                    
+                    $shijian = date('m-d H:i',time());
+                }else if($flows['flow_type'] == 'qingjia'){
+                   
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = $info['start'].' 至 '.$info['end'];
+                    if($info['leixing'] == 1){
+                        $neirong .= '，事假 ';
+                    }else if($info['leixing'] == 2){
+                        $neirong .= '，婚假 ';
+                    }else if($info['leixing'] == 3){
+                        $neirong .= '，产假 ';
+                    }else if($info['leixing'] == 4){
+                        $neirong .= '，丧假 ';
+                    }else if($info['leixing'] == 5){
+                        $neirong .= '，调休 ';
+                    }
+                    
+                    $shijian = date('m-d H:i',time());
+                }else if($flows['flow_type'] == 'gnchuchai'){
+                    
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = $info['start'].' 至 ';
+                    $neirong .= $info['end'].' ，从 ';
+                    $neirong .= $info['chufa'].' 至 ';
+                    $neirong .= $info['mudi'].' ';
+                    
+                    if($info['cctype'] == 1){
+                        $neirong .= '单程';
+                    }else{
+                        $neirong .= '往返';
+                    }
+                    $neirong = str_replace('>','',$neirong);
+                    
+                    $shijian = date('m-d H:i',time());
+                }else if($flows['flow_type'] == 'gjchuchai'){
+                    
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = $info['start'].' 至 ';
+                    $neirong .= $info['end'].' ，从 ';
+                    $neirong .= $info['chufa'].' 至 ';
+                    $neirong .= $info['mudi'].' ';
+                    
+                    if($info['cctype'] == 1){
+                        $neirong .= '，单程';
+                    }else{
+                        $neirong .= '，往返';
+                    }
+                    $neirong = str_replace('>','',$neirong);
+                    
+                    $shijian = date('m-d H:i',time());
+                }else if($flows['flow_type'] == 'burujia'){
+                    
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = $info['start'].' 至 '.$info['end'];
+                    if($info['leixing'] == 1){
+                        $neirong .= '，延后上班1小时';
+                    }else if($info['leixing'] == 2){
+                        $neirong .= '，提前下班1小时';
+                    }
+                    $shijian = date('m-d H:i',time());
+                }else if($flows['flow_type'] == 'zhoukoutou'){
+                    
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = $info['zhouci'].'周口头交流统计单';
+                   
+                    $shijian = date('m-d H:i',time());
+                }else if($flows['flow_type'] == 'lizhi'){
+                    
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = '离职';
+                   
+                    $shijian = date('m-d H:i',time());
+                    
+                }else if($flows['flow_type'] == 'canhui'){
+                    
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = $info['zhouci']."，".Db::name('cate')->where('id',$info['group_id'])->value('title')."「库尔大学堂参会情况统计单」";
+                   
+                    $shijian = date('m-d H:i',time());
+                }else if($flows['flow_type'] == 'zhuangang'){
+                    
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $neirong = '转岗';
+                   
+                    $shijian = date('m-d H:i',time());
+                    
+                }else if($flows['flow_type'] == 'ruzhi'){
+                    
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    $group_name = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                    
+                    $neirong = $info['username'].' 入职 '.$group_name.'-'.$info['gangwei'].' 岗位';
+                   
+                    $shijian = date('m-d H:i',time());
+                    
+                }else if($flows['flow_type'] == 'sbsqd'){
+                    
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    // $group_name = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                    
+                    $neirong = $uname.' 社保申请已撤回';
+                   
+                    $shijian = date('m-d H:i',time());
+                    
+                }else if($flows['flow_type'] == 'zhuanzhengjinji'){
+                    
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    // $group_name = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                    
+                    $neirong = $uname.' 转正晋级申请已撤回';
+                   
+                    $shijian = date('m-d H:i',time());
+                    
+                }else if($flows['flow_type'] == 'nianjia'){
+                    
+                    $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                    
+                    // $group_name = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                    
+                    $neirong = $uname.' 夏季年假已撤回';
+                   
+                    $shijian = date('m-d H:i',time());
+                    
+                }
+                
+                $whra = [];
+                $whra[] = ['unionid','=',$data['parentid']];
+                $whra[] = ['apply_uid','>',0];
+                $uuid = Db::name('flow_apply')->field('apply_uid')->where($whra)->buildSql(true);
+            
+                $openlist = Db::name('weixin')->field('uid,openid')->where('uid','exp','In '.$uuid)->select();
+                foreach ($openlist as $k => $v){
+                    if($v['openid']){
+                         //所有字段都可为空---审批拒绝
+                        $dataq['uname'] = Db::name('users')->where('id',$v['uid'])->value('username');
+                        $dataq['neirong'] = $neirong;
+                        $dataq['shijian'] = $shijian;
+                        $dataq['openid'] = $v['openid'];
+                        Db::name('wxnotice')->insert($dataq);
+                        
+                        //更新为申请人
+                        $dataq['uname'] = $uname;
+                        
+                        $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                        $url=$http_type.$_SERVER['HTTP_HOST']."/api/wxnofiy/chehui_notice";
+                        http_curl($url,'post','json',$dataq);
+                    }
+                }
+            
+                echo apireturn(200,'success','');die;
+                
+            }else{
+                echo apireturn(201,'fiald','');die;
+            }
+        }else{
+            echo apireturn(201,'当前状态不可撤回','');die;
+        }
+        
+    }
     
     //处理审批
     public function apply_handle(){
@@ -1194,15 +2107,77 @@ class Flow extends Base
                         }else if($info['leixing'] == 2){
                             $neirong .= '，提前下班1小时';
                         }
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                    }else if($flows['flow_type'] == 'zhoukoutou'){
                         
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = $info['zhouci'].'周口头交流统计单';
+                       
+                        $shijian = '点击查看详情';
+                    }else if($flows['flow_type'] == 'lizhi'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = '离职';
                        
                         $shijian = date('m-d H:i',$flows['create_time']);
+                        
+                    }else if($flows['flow_type'] == 'canhui'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = "您提交的".$info['zhouci']."，".Db::name('cate')->where('id',$info['group_id'])->value('title')."「库尔大学堂参会情况统计单」";
+                       
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                    }else if($flows['flow_type'] == 'zhuangang'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = '转岗';
+                       
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                        
+                    }else if($flows['flow_type'] == 'ruzhi'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $group_name = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                        
+                        $neirong = '您提交的新员工 '.$info['username'].' 入职 '.$group_name.'-'.$info['gangwei'].' 岗位';
+                       
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                        
+                    }else if($flows['flow_type'] == 'sbsqd'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = '社保申请单';
+                       
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                        
+                    }else if($flows['flow_type'] == 'zhuanzhengjinji'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = '转正晋级审批';
+                       
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                        
+                    }else if($flows['flow_type'] == 'nianjia'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = '夏季年假';
+                       
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                        
                     }
                     
                     $openlist = Db::name('weixin')->field('uid,openid')->where('uid','in',$infoz['shenqing_uid'])->select();
                     foreach ($openlist as $k => $v){
                         if($v['openid']){
-                             //所有字段都可为空
+                             //所有字段都可为空---审批拒绝
                             $dataq['uname'] = Db::name('users')->where('id',$v['uid'])->value('username');
                             $dataq['neirong'] = $neirong;
                             $dataq['shijian'] = $shijian;
@@ -1238,7 +2213,6 @@ class Flow extends Base
                     //     start_apply($unionid,$info['sort']);
                     // }
                     
-                    
                 }
             }else{
                 echo apireturn(201,'当前已审核或无需审核','');die;
@@ -1247,29 +2221,206 @@ class Flow extends Base
                 start_apply($unionid,$infoz['sort']);
             }
         }else{
-            if($info['status'] == 1){
+            if($infoz['status'] == 1){
                 $data['status'] = $status;
                 $data['remark'] = $remark;
                 $data['app_time'] = time();
                 Db::name('flow_apply')->where($whr)->update($data);
-            
-                $dataz['status'] = 4;
-                $dataz['remark'] = $remark;
-                $dataz['app_time'] = time();
-                //或签一个通过或拒绝后其他人设置为无需操作
-                $whrj['unionid'] = $unionid;
-                $whrj['sort'] = $info['sort'];
-                $whrj['status'] = 1;
-                Db::name('flow_apply')->where($whrj)->update($dataz);
+                if($status == 3){
+                    
+                    $flows = Db::name('flow_list')->field('uid,flow_type,flow_id,create_time')->where('parentid',$unionid)->find();
+                    $info = Db::name($flows['flow_type'])->where('id',$flows['flow_id'])->find();
                 
-                //修改申请单状态
-                $whrz['parentid'] = $unionid;
-                $datazz['status'] = $status;
-                $datazz['update_time'] = time();
-                Db::name('flow_list')->where($whrz)->update($datazz);
+                    if($flows['flow_type'] == 'jiaban'){
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = $info['start'].' 至 '.$info['end'];
+                        if($info['leixing'] == 1){
+                            $neirong .= '，「日常加班」申请';
+                        }else if($info['leixing'] == 2){
+                            $neirong .= '，「周六日加班」申请';
+                        }
+                        
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                    }else if($flows['flow_type'] == 'buka'){
+                    
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = $info['riqi'].' ';
+                        if($info['leixing'] == 2){
+                            $lxname = $info['shijian'].'，迟到';
+                        }else if($info['leixing'] == 3){
+                            $lxname = $info['shijian'].'，早退';
+                        }else if($info['leixing'] == 4){
+                            $lxname = $info['shijian'].'，缺卡';
+                        }
+                        $neirong .=  '补卡申请';
+                        
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                    }else if($flows['flow_type'] == 'qingjia'){
+                       
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = $info['start'].' 至 '.$info['end'];
+                        if($info['leixing'] == 1){
+                            $neirong .= '，事假 ';
+                        }else if($info['leixing'] == 2){
+                            $neirong .= '，婚假 ';
+                        }else if($info['leixing'] == 3){
+                            $neirong .= '，产假 ';
+                        }else if($info['leixing'] == 4){
+                            $neirong .= '，丧假 ';
+                        }else if($info['leixing'] == 5){
+                            $neirong .= '，调休 ';
+                        }
+                        
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                    }else if($flows['flow_type'] == 'gnchuchai'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = $info['start'].' 至 ';
+                        $neirong .= $info['end'].' ，从 ';
+                        $neirong .= $info['chufa'].' 至 ';
+                        $neirong .= $info['mudi'].' ';
+                        
+                        if($info['cctype'] == 1){
+                            $neirong .= '单程';
+                        }else{
+                            $neirong .= '往返';
+                        }
+                        $neirong = str_replace('>','',$neirong);
+                        
+                        
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                    }else if($flows['flow_type'] == 'gjchuchai'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = $info['start'].' 至 ';
+                        $neirong .= $info['end'].' ，从 ';
+                        $neirong .= $info['chufa'].' 至 ';
+                        $neirong .= $info['mudi'].' ';
+                        
+                        if($info['cctype'] == 1){
+                            $neirong .= '，单程';
+                        }else{
+                            $neirong .= '，往返';
+                        }
+                        $neirong = str_replace('>','',$neirong);
+                        
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                    }else if($flows['flow_type'] == 'burujia'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = $info['start'].' 至 '.$info['end'];
+                        if($info['leixing'] == 1){
+                            $neirong .= '，延后上班1小时';
+                        }else if($info['leixing'] == 2){
+                            $neirong .= '，提前下班1小时';
+                        }
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                    }else if($flows['flow_type'] == 'zhoukoutou'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = $info['zhouci'].'周口头交流统计单';
+                       
+                        $shijian = '点击查看详情';
+                    }else if($flows['flow_type'] == 'lizhi'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = '离职';
+                       
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                        
+                    }else if($flows['flow_type'] == 'canhui'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = "您提交的".$info['zhouci']."，".Db::name('cate')->where('id',$info['group_id'])->value('title')."「库尔大学堂参会情况统计单」";
+                       
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                    }else if($flows['flow_type'] == 'zhuangang'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = '您提交的「转岗」申请';
+                       
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                        
+                    }else if($flows['flow_type'] == 'ruzhi'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $group_name = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                        
+                        $neirong = '您提交的新员工 '.$info['username'].' 入职 '.$group_name.'-'.$info['gangwei'].' 岗位';
+                       
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                        
+                    }else if($flows['flow_type'] == 'sbsqd'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = '您提交的「社保」申请';
+                       
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                        
+                    }else if($flows['flow_type'] == 'zhuanzhengjinji'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = '您提交的「转正晋级审批」申请';
+                       
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                        
+                    }else if($flows['flow_type'] == 'nianjia'){
+                        
+                        $uname = Db::name('users')->where('id',$flows['uid'])->value('username');
+                        
+                        $neirong = '您提交的「夏季年假」申请';
+                       
+                        $shijian = date('m-d H:i',$flows['create_time']);
+                        
+                    }
+                    
+                    $openlist = Db::name('weixin')->field('uid,openid')->where('uid','in',$infoz['shenqing_uid'])->select();
+                    foreach ($openlist as $k => $v){
+                        if($v['openid']){
+                             //所有字段都可为空---审批拒绝
+                            $dataq['uname'] = Db::name('users')->where('id',$v['uid'])->value('username');
+                            $dataq['neirong'] = $neirong;
+                            $dataq['shijian'] = $shijian;
+                            $dataq['openid'] = $v['openid'];
+                            $dataq['type'] = 3;
+                            Db::name('wxnotice')->insert($dataq);
+                            $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                            $url=$http_type.$_SERVER['HTTP_HOST']."/api/wxnofiy/tongzhi";
+                            http_curl($url,'post','json',$dataq);
+                        }
+                    }
+                  
+                    $dataz['status'] = 4;
+                    //$dataz['remark'] = $remark;
+                    $dataz['app_time'] = time();
+                    //或签一个通过或拒绝后其他人设置为无需操作
+                    $whrj['unionid'] = $unionid;
+                    $whrj['sort'] = $infoz['sort'];
+                    $whrj['status'] = 1;
+                    Db::name('flow_apply')->where($whrj)->update($dataz);
+                    
+                    //修改申请单状态
+                    $whrz['parentid'] = $unionid;
+                    $datazz['status'] = $status;
+                    $datazz['update_time'] = time();
+                    Db::name('flow_list')->where($whrz)->update($datazz);
+                }
                 
-                if($info['flow_leixing'] != 4){
-                    start_apply($unionid,$info['sort']);
+                if($infoz['flow_leixing'] != 4){
+                    start_apply($unionid,$infoz['sort']);
                 }
             }else{
                 echo apireturn(201,'当前已审核或无需审核','');die;
@@ -1340,6 +2491,47 @@ class Flow extends Base
             $data['url'] = $url;
             $data['sort'] = 1;
             $data['time'] = $time;
+            $data['unionid'] = $unionid;
+            
+            Db::name('flow_image')->insert($data);
+         
+            $photo_list = Db::name('flow_image')->where('uid',$this->user_id)->where('unionid',$unionid)->select();
+            foreach ($photo_list as $key => $val){
+                $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                $photo_list[$key]['url'] = $http_type.$_SERVER['HTTP_HOST'].$val['url'];
+            }
+            
+            $rs_arr['status'] = 200;
+            $rs_arr['msg'] = '提交成功';
+            $rs_arr['data'] = $photo_list;
+            return json_encode($rs_arr,true);
+            exit;
+            
+        }
+    }
+    //上传文件
+    public function uploadsfile(){
+        if(Request::isPost()) {
+            $time = Request::param('time');
+            $leixing = Request::param('leixing');
+            $name = Request::param('name');
+            $unionid = Request::param('unionid');
+            //file是传文件的名称，这是webloader插件固定写入的。因为webloader插件会写入一个隐藏input，不信你们可以通过浏览器检查页面
+            $file = request()->file('files');
+            
+            $info = $file->validate(['ext' => 'jpg,png,pdf,xlsx,docx,doc,ppt'])->move('uploads/flowfile');
+            
+            $Type = $info->getExtension();
+            
+            $url =  "/uploads/flowfile/".$info->getSaveName();
+            $url = str_replace("\\","/",$url);
+           
+            $data['uid'] = $this->user_id;
+            $data['url'] = $url;
+            $data['sort'] = 1;
+            $data['time'] = $time;
+            $data['leixing'] = $leixing;
+            $data['name'] = $name;
             $data['unionid'] = $unionid;
             
             Db::name('flow_image')->insert($data);

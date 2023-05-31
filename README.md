@@ -1,3 +1,19 @@
+SIYUCMS5.1.3
+===============
+
+SIYUCMS内容管理系统：
+
+ + 采用ThinkPHP5.1.38.1开发
+
+> PHP >= 5.6.0
+
+> PDO PHP Extension
+
+> MBstring PHP Extension
+
+> SIYUCMS5.1及后续版本运行目录: public/
+
+
 ## 在线手册
 
 + [完全开发手册](https://www.kancloud.cn/ruoshuiyx/siyucms/)

@@ -263,6 +263,27 @@ class AttendanceGroup extends Base
         if($info){
             if($info['status'] == 1){
                 //设置为排除
+                //$upd['status']=2;
+                Db::name('attendance_group_user')->delete($data['id']);
+                echo apireturns(200,200,'success','');
+                die;
+            }
+        }else{
+            echo apireturns(200,201,'该数据不存在','');
+            die;
+        }
+        
+        
+    }
+    
+    
+    public function organize_status——bf(){
+        
+        $data = Request::param();
+        $info = Db::name('attendance_group_user')->where('id',$data['id'])->find();
+        if($info){
+            if($info['status'] == 1){
+                //设置为排除
                 $upd['status']=2;
                 Db::name('attendance_group_user')->where('id',$data['id'])->update($upd);
                 echo apireturns(200,200,'success','');
@@ -423,7 +444,7 @@ class AttendanceGroup extends Base
                     $clist[$keys]['group_name'] = $group_list;
                 }
             }else{
-                $clist[$keys]['group_name'] = '';
+                $clist[0]['group_name'] = '';
             }
 
             $memberlist[$key]['clist'] = $clist;

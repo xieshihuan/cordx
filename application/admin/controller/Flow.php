@@ -16,6 +16,21 @@ class Flow extends Base
 {
     protected $validate = 'Flow';
     
+    
+    //获取数据表字段包含注释
+    public function getFiled(){
+        
+        $table = input('table');
+        $list = get_fieldlist(config('database.prefix').$table);
+
+        $data_rt['status'] = 200;
+        $data_rt['msg'] = 'success';
+        $data_rt['data'] = $list;
+        return json_encode($data_rt);
+        exit;
+
+    }
+    
     //列表
     public function index(){
         //条件筛选

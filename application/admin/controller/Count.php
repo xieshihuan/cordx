@@ -23,11 +23,55 @@ class Count extends Base
         
         $where=[];
         
+        
+        $b = '';
+        if(!empty($organizeid)){
+            
+            $check_ruless = Db::name('users')->where('id',$this->admin_id)->value('check_ruless');
+            $check_ruless = explode(',',$check_ruless);
+            if(in_array($organizeid,$check_ruless)){
+                $whr2=[];
+                $whr2[] = ['catid', '=', $organizeid];
+    
+                $uids = Db::name('cateuser')
+                    ->where($whr2)
+                    ->field('uid')
+                    ->select();
+    
+                foreach($uids as $key => $val){
+                    $b .= $val['uid'].',';
+                }
+            }else{
+                echo apireturn(200,'无数据','');die;
+            }
+            
+        }else{
+        
+            $check_ruless = Db::name('users')->where('id',$this->admin_id)->value('check_ruless');
+            
+            $whr2=[];
+            $whr2[] = ['catid', 'in', $check_ruless];
+            $whr2[] = ['leixing', '=', 1];
+            
+            $uids = Db::name('cateuser')
+                ->where($whr2)
+                ->field('uid')
+                ->select();
+
+            foreach($uids as $key => $val){
+                $b .= $val['uid'].',';
+            }
+            
+        }
+        
+        $b = trim($b,',');
+        
         $a = '';
         if(!empty($keyword)){
             
             $whr1=[];
             $whr1[]=['username|mobile', 'like', '%'.$keyword.'%'];
+            $whr1[]=['id', 'in', $b];
             
             $ids = Db::name('users')
                 ->where($whr1)
@@ -37,24 +81,13 @@ class Count extends Base
             foreach($ids as $key => $val){
                 $a .= $val['id'].',';
             }
+            $where[] = ['uid','in',$a];	
+        }else{
             
+            $where[] = ['uid','in',$b];	
+           
         }
         
-        $b = '';
-        if(!empty($organizeid)){
-            
-            $whr2=[];
-            $whr2[]=['catid', '=', $organizeid];
-
-            $uids = Db::name('cateuser')
-                ->where($whr2)
-                ->field('uid')
-                ->select();
-
-            foreach($uids as $key => $val){
-                $b .= $val['uid'].',';
-            }
-        }
         
         if(isset($startDate)&&$startDate!=""&&isset($endDate)&&$endDate=="")
         {
@@ -101,11 +134,6 @@ class Count extends Base
         $aa = $pageSize*($page-1);
         
         //查询选中的人
-        if(empty($a.$b)){
-            $where[] = ['uid','>',0];
-        }else{
-            $where[] = ['uid','in',$a.$b];			
-        }
         
         if(!empty($one)){
             $lists = Db::name('check_count')
@@ -769,28 +797,34 @@ class Count extends Base
         
         $where=[];
         
-        $a = '';
-        if(!empty($keyword)){
-            
-            $whr1=[];
-            $whr1[]=['username|mobile', 'like', '%'.$keyword.'%'];
-            
-            $ids = Db::name('users')
-                ->where($whr1)
-                ->field('id')
-                ->select();
-
-            foreach($ids as $key => $val){
-                $a .= $val['id'].',';
-            }
-            
-        }
-        
         $b = '';
         if(!empty($organizeid)){
             
+            $check_ruless = Db::name('users')->where('id',$this->admin_id)->value('check_ruless');
+            $check_ruless = explode(',',$check_ruless);
+            if(in_array($organizeid,$check_ruless)){
+                $whr2=[];
+                $whr2[] = ['catid', '=', $organizeid];
+    
+                $uids = Db::name('cateuser')
+                    ->where($whr2)
+                    ->field('uid')
+                    ->select();
+    
+                foreach($uids as $key => $val){
+                    $b .= $val['uid'].',';
+                }
+            }else{
+                echo apireturn(200,'无数据','');die;
+            }
+            
+        }else{
+        
+            $check_ruless = Db::name('users')->where('id',$this->admin_id)->value('check_ruless');
+            
             $whr2=[];
-            $whr2[]=['catid', '=', $organizeid];
+            $whr2[]=['catid', 'in', $check_ruless];
+            $whr2[]=['leixing', '=', 1];
 
             $uids = Db::name('cateuser')
                 ->where($whr2)
@@ -800,6 +834,31 @@ class Count extends Base
             foreach($uids as $key => $val){
                 $b .= $val['uid'].',';
             }
+            
+        }
+        
+        $b = trim($b,',');
+        
+        $a = '';
+        if(!empty($keyword)){
+            
+            $whr1=[];
+            $whr1[]=['username|mobile', 'like', '%'.$keyword.'%'];
+            $whr1[]=['id', 'in', $b];
+            
+            $ids = Db::name('users')
+                ->where($whr1)
+                ->field('id')
+                ->select();
+
+            foreach($ids as $key => $val){
+                $a .= $val['id'].',';
+            }
+            $where[] = ['uid','in',$a];	
+        }else{
+            
+            $where[] = ['uid','in',$b];	
+           
         }
         
         
@@ -810,15 +869,16 @@ class Count extends Base
             
             $startDates = date('Y-m-d H:i:s',$start);
             $endDates = date('Y-m-d',$end).' 23:59:59';
-        }else{
-            $end = time();
-            $start = time()-864000;
-            $startDate = date('Y-m-d',$start);
-            $endDate = date('Y-m-d',$end);
-            
-            $startDates = date('Y-m-d H:i:s',$start);
-            $endDates = date('Y-m-d H:i:s',$end);
         }
+        // else{
+        //     $end = time();
+        //     $start = time()-864000;
+        //     $startDate = date('Y-m-d',$start);
+        //     $endDate = date('Y-m-d',$end);
+            
+        //     $startDates = date('Y-m-d H:i:s',$start);
+        //     $endDates = date('Y-m-d H:i:s',$end);
+        // }
         
         if(!empty($attendance_group_id)){
             $where[] = ['attendance_group_id','=',$attendance_group_id];
@@ -845,13 +905,6 @@ class Count extends Base
         $page = Request::param('page') ? Request::param('page') : 1;
 
         $aa = $pageSize*($page-1);
-        
-        //查询选中的人
-        if(empty($a.$b)){
-            $where[] = ['uid','>',0];
-        }else{
-            $where[] = ['uid','in',$a.$b];			
-        }
         
         if(!empty($one)){
             $lists = Db::name('check_count')
@@ -891,6 +944,30 @@ class Count extends Base
         $cdnum = 0;
         $ztnum = 0;
         foreach ($list as $key => $val){
+            
+            
+            //周口头
+            $wherezkt = [];
+            $wherezkt[] = ['zkt.shuzhiriqi','between',[$startDates,$endDates]];
+            
+            $zktlist = Db::name('zhoukoutou')
+            ->alias('zkt')
+            ->leftJoin('flow_list fl','fl.flow_id = zkt.id')
+            ->where('flow_type','zhoukoutou')->where($wherezkt)->where('zkt.uid',$val['uid'])->where('fl.status',2)->select();
+            $zktname = '';
+            foreach ($zktlist as $k => $v){
+                $year = date('Y',strtotime($v['shuzhiriqi']));
+                $week = date('W',strtotime($v['shuzhiriqi']));
+                $zktname .= '第'.$week.'周'.',';
+            }
+            $zktname = rtrim($zktname,',');
+            if(count($zktlist) > 0){
+                $list[$key]['zhoukoutou'] = count($zktlist).' ('.$zktname.')';
+            }else{
+                $list[$key]['zhoukoutou'] = 0;
+            }
+            
+            
             //查询出差时长
             $whereccgn = [];
             $whereccgn[] = ['gn.start','between',[$startDate,$endDate]];
@@ -928,10 +1005,15 @@ class Count extends Base
             ->where('flow_type','jiaban')->where($wherejb)->where('jb.uid',$val['uid'])->where('fl.status',2)->sum('shichang');
             
             //查询会员信息
-            $uinfo = Db::name('users')->field('username,mobile')->where('id',$val['uid'])->find();
-            $list[$key]['username'] = $uinfo['username'];
+            $uinfo = Db::name('users')->field('username,mobile,is_delete')->where('id',$val['uid'])->find();
+            if($uinfo['is_delete'] == 2){
+                $list[$key]['username'] = $uinfo['username'].'  (已离职)';
+            }else{
+                $list[$key]['username'] = $uinfo['username'];
+            }
             $whra['uid'] = $val['uid'];
             $whra['leixing'] = 1;
+            
             $clist = Db::name('cateuser')
                 ->field('catid')
                 ->where($whra)
@@ -984,23 +1066,26 @@ class Count extends Base
             
             //实际出勤天数
             $shiji = 0;
-            
             $classinfos = '';
-            
             while($i <= $o)
             {
-                
                 $checklog = '';
                 $checklog2 = '';
-                
                 $starts = date('Y-m-d',$i);
-                
                 //查询班次
                 $classlist = Db::name('check_count')
                         ->where($where)
                         ->where('day',$starts)
                         ->where('uid',$val['uid'])
                         ->select();
+                        
+                if(count($classlist) == 0){
+                    $ccinfo = Db::name('check_count')->where('uid',$val['uid'])->order('id desc')->find();
+                    $classlist[0]['attendance_group_id'] = $ccinfo['attendance_group_id'];
+                    $classlist[0]['classesid'] = $ccinfo['classesid'];
+                    $classlist[0]['uid'] = $val['uid'];
+                    $classlist[0]['day'] = $starts;
+                }
             
                 $one = 0;
                 $two = 0;
@@ -1023,7 +1108,70 @@ class Count extends Base
                                 $one = 1;
                             }
                         }else{
-                            $checklog = $checklog."缺卡()";
+                            
+                            $status_name = '';
+                            $one_in_time = date('Y-m-d H:i:s',strtotime($valz['day'].$classinfoz['one_in']));
+                                        
+                            //查询是否请假
+                            $whereqj = [];
+                            $whereqj[] = ['start','<=',$one_in_time];
+                            $whereqj[] = ['end','>=',$one_in_time];
+                            $whereqj[] = ['qj.uid','=',$valz['uid']];
+                            $whereqj[] = ['fl.flow_type','=','qingjia'];
+                            $whereqj[] = ['fl.status','=',2];
+                            $qjinfo = Db::name('qingjia')
+                                    ->alias('qj')
+                                    ->leftJoin('flow_list fl','fl.flow_id = qj.id')
+                                    ->field('qj.*,fl.*')
+                                    ->where($whereqj)
+                                    ->find();
+                            if($qjinfo){
+                                $status_name = qingjia($qjinfo['leixing']);
+                            }
+                            //查询是否国内出差
+                            if(empty($status_name)){
+                                $one_in_date = $val['day'];
+                                $wheregn = [];
+                                $wheregn[] = ['start','<=',$one_in_date];
+                                $wheregn[] = ['end','>=',$one_in_date];
+                                $wheregn[] = ['gn.uid','=',$val['uid']];
+                                $wheregn[] = ['fl.flow_type','=','gnchuchai'];
+                                $wheregn[] = ['fl.status','=',2];
+                               
+                                $gninfo = Db::name('gnchuchai')
+                                        ->alias('gn')
+                                        ->leftJoin('flow_list fl','fl.flow_id = gn.id')
+                                        ->field('gn.*,fl.*')
+                                        ->where($wheregn)
+                                        ->find();
+                                 
+                                if($gninfo){
+                                    $status_name = '国内出差';
+                                }
+                            }
+                            //查询是否国际出差
+                            if(empty($status_name)){
+                                $wheregj = [];
+                                $wheregj[] = ['start','<=',$one_in_date];
+                                $wheregj[] = ['end','>=',$one_in_date];
+                                $wheregj[] = ['gj.uid','=',$val['uid']];
+                                $wheregj[] = ['fl.flow_type','=','gjchuchai'];
+                                $wheregj[] = ['fl.status','=',2];
+                                $gjinfo = Db::name('gjchuchai')
+                                        ->alias('gj')
+                                        ->leftJoin('flow_list fl','fl.flow_id = gj.id')
+                                        ->field('gj.*,fl.*')
+                                        ->where($wheregj)
+                                        ->find();
+                                if($gjinfo){
+                                    $status_name = '国际出差';
+                                }
+                            }
+                            if(!empty($status_name)){
+                                $checklog = $checklog.$status_name."()";
+                            }else{
+                                $checklog = $checklog."缺卡()";
+                            }
                         }
                         
                         $where2['riqi'] = $valz['day'];;
@@ -1038,7 +1186,67 @@ class Count extends Base
                                 $two = 1;
                             }
                         }else{
-                            $checklog = $checklog."缺卡()";
+                            
+                            $status_name = '';
+                            $one_out_time = date('Y-m-d H:i:s',strtotime($valz['day'].$classinfoz['one_out']));
+                            //查询是否请假
+                            $whereqj = [];
+                            $whereqj[] = ['start','<=',$one_out_time];
+                            $whereqj[] = ['end','>=',$one_out_time];
+                            $whereqj[] = ['qj.uid','=',$valz['uid']];
+                            $whereqj[] = ['fl.flow_type','=','qingjia'];
+                            $whereqj[] = ['fl.status','=',2];
+                            $qjinfo = Db::name('qingjia')
+                                    ->alias('qj')
+                                    ->leftJoin('flow_list fl','fl.flow_id = qj.id')
+                                    ->field('qj.*,fl.*')
+                                    ->where($whereqj)
+                                    ->find();
+                            if($qjinfo){
+                                $status_name = qingjia($qjinfo['leixing']);
+                            }
+                            //查询是否国内出差
+                            if(empty($status_name)){
+                                $one_out_date = $val['day'];
+                                $wheregn = [];
+                                $wheregn[] = ['start','<=',$one_out_date];
+                                $wheregn[] = ['end','>=',$one_out_date];
+                                $wheregn[] = ['gn.uid','=',$val['uid']];
+                                $wheregn[] = ['fl.flow_type','=','gnchuchai'];
+                                $wheregn[] = ['fl.status','=',2];
+                                $gninfo = Db::name('gnchuchai')
+                                        ->alias('gn')
+                                        ->leftJoin('flow_list fl','fl.flow_id = gn.id')
+                                        ->field('gn.*,fl.*')
+                                        ->where($wheregn)
+                                        ->find();
+                                if($gninfo){
+                                    $status_name = '国内出差';
+                                }
+                            }
+                            //查询是否国际出差
+                            if(empty($status_name)){
+                                $wheregj = [];
+                                $wheregj[] = ['start','<=',$one_out_date];
+                                $wheregj[] = ['end','>=',$one_out_date];
+                                $wheregj[] = ['gj.uid','=',$val['uid']];
+                                $wheregj[] = ['fl.flow_type','=','gjchuchai'];
+                                $wheregj[] = ['fl.status','=',2];
+                                $gjinfo = Db::name('gjchuchai')
+                                        ->alias('gj')
+                                        ->leftJoin('flow_list fl','fl.flow_id = gj.id')
+                                        ->field('gj.*,fl.*')
+                                        ->where($wheregj)
+                                        ->find();
+                                if($gjinfo){
+                                    $status_name = '国际出差';
+                                }
+                            }
+                            if(!empty($status_name)){
+                                $checklog = $checklog.$status_name."()";
+                            }else{
+                                $checklog = $checklog."缺卡()";
+                            }
                         }
                         
                         if($one == 1 && $two == 1){
@@ -1059,7 +1267,70 @@ class Count extends Base
                                 $one = 1;
                             }
                         }else{
-                            $checklog = $checklog."缺卡()";
+                            
+                            $status_name = '';
+                            $one_in_time = date('Y-m-d H:i:s',strtotime($valz['day'].$classinfoz['one_in']));
+                                 
+                            //查询是否请假
+                            $whereqj = [];
+                            $whereqj[] = ['start','<=',$one_in_time];
+                            $whereqj[] = ['end','>=',$one_in_time];
+                            $whereqj[] = ['qj.uid','=',$valz['uid']];
+                            $whereqj[] = ['fl.flow_type','=','qingjia'];
+                            $whereqj[] = ['fl.status','=',2];
+                            $qjinfo = Db::name('qingjia')
+                                    ->alias('qj')
+                                    ->leftJoin('flow_list fl','fl.flow_id = qj.id')
+                                    ->field('qj.*,fl.*')
+                                    ->where($whereqj)
+                                    ->find();
+                            if($qjinfo){
+                                $status_name = qingjia($qjinfo['leixing']);
+                            }
+                            //查询是否国内出差
+                            if(empty($status_name)){
+                                $one_in_date = $val['day'];
+                                $wheregn = [];
+                                $wheregn[] = ['start','<=',$one_in_date];
+                                $wheregn[] = ['end','>=',$one_in_date];
+                                $wheregn[] = ['gn.uid','=',$val['uid']];
+                                $wheregn[] = ['fl.flow_type','=','gnchuchai'];
+                                $wheregn[] = ['fl.status','=',2];
+                               
+                                $gninfo = Db::name('gnchuchai')
+                                        ->alias('gn')
+                                        ->leftJoin('flow_list fl','fl.flow_id = gn.id')
+                                        ->field('gn.*,fl.*')
+                                        ->where($wheregn)
+                                        ->find();
+                                 
+                                if($gninfo){
+                                    $status_name = '国内出差';
+                                }
+                            }
+                            //查询是否国际出差
+                            if(empty($status_name)){
+                                $wheregj = [];
+                                $wheregj[] = ['start','<=',$one_in_date];
+                                $wheregj[] = ['end','>=',$one_in_date];
+                                $wheregj[] = ['gj.uid','=',$val['uid']];
+                                $wheregj[] = ['fl.flow_type','=','gjchuchai'];
+                                $wheregj[] = ['fl.status','=',2];
+                                $gjinfo = Db::name('gjchuchai')
+                                        ->alias('gj')
+                                        ->leftJoin('flow_list fl','fl.flow_id = gj.id')
+                                        ->field('gj.*,fl.*')
+                                        ->where($wheregj)
+                                        ->find();
+                                if($gjinfo){
+                                    $status_name = '国际出差';
+                                }
+                            }   
+                            if(!empty($status_name)){
+                                $checklog = $checklog.$status_name."()";
+                            }else{
+                                $checklog = $checklog."缺卡()";
+                            }
                         }
                         
                         $where2['riqi'] = $valz['day'];;
@@ -1074,7 +1345,66 @@ class Count extends Base
                                 $two = 1;
                             }
                         }else{
-                            $checklog = $checklog."缺卡()";
+                            $status_name = '';
+                            $one_out_time = date('Y-m-d H:i:s',strtotime($valz['day'].$classinfoz['one_out']));
+                            //查询是否请假
+                            $whereqj = [];
+                            $whereqj[] = ['start','<=',$one_out_time];
+                            $whereqj[] = ['end','>=',$one_out_time];
+                            $whereqj[] = ['qj.uid','=',$valz['uid']];
+                            $whereqj[] = ['fl.flow_type','=','qingjia'];
+                            $whereqj[] = ['fl.status','=',2];
+                            $qjinfo = Db::name('qingjia')
+                                    ->alias('qj')
+                                    ->leftJoin('flow_list fl','fl.flow_id = qj.id')
+                                    ->field('qj.*,fl.*')
+                                    ->where($whereqj)
+                                    ->find();
+                            if($qjinfo){
+                                $status_name = qingjia($qjinfo['leixing']);
+                            }
+                            //查询是否国内出差
+                            if(empty($status_name)){
+                                $one_out_date = $val['day'];
+                                $wheregn = [];
+                                $wheregn[] = ['start','<=',$one_out_date];
+                                $wheregn[] = ['end','>=',$one_out_date];
+                                $wheregn[] = ['gn.uid','=',$val['uid']];
+                                $wheregn[] = ['fl.flow_type','=','gnchuchai'];
+                                $wheregn[] = ['fl.status','=',2];
+                                $gninfo = Db::name('gnchuchai')
+                                        ->alias('gn')
+                                        ->leftJoin('flow_list fl','fl.flow_id = gn.id')
+                                        ->field('gn.*,fl.*')
+                                        ->where($wheregn)
+                                        ->find();
+                                if($gninfo){
+                                    $status_name = '国内出差';
+                                }
+                            }
+                            //查询是否国际出差
+                            if(empty($status_name)){
+                                $wheregj = [];
+                                $wheregj[] = ['start','<=',$one_out_date];
+                                $wheregj[] = ['end','>=',$one_out_date];
+                                $wheregj[] = ['gj.uid','=',$val['uid']];
+                                $wheregj[] = ['fl.flow_type','=','gjchuchai'];
+                                $wheregj[] = ['fl.status','=',2];
+                                $gjinfo = Db::name('gjchuchai')
+                                        ->alias('gj')
+                                        ->leftJoin('flow_list fl','fl.flow_id = gj.id')
+                                        ->field('gj.*,fl.*')
+                                        ->where($wheregj)
+                                        ->find();
+                                if($gjinfo){
+                                    $status_name = '国际出差';
+                                }
+                            }   
+                            if(!empty($status_name)){
+                                $checklog = $checklog.$status_name."()";
+                            }else{
+                                $checklog = $checklog."缺卡()";
+                            }
                         }
                         
                         if($one == 1 && $two == 1){
@@ -1093,7 +1423,67 @@ class Count extends Base
                                 $three = 1;
                             }
                         }else{
-                            $checklog = $checklog."缺卡()";
+                            $status_name = '';
+                            $two_in_time = date('Y-m-d H:i:s',strtotime($valz['day'].$classinfoz['two_in']));
+                            //查询是否请假
+                            $whereqj = [];
+                            $whereqj[] = ['start','<=',$two_in_time];
+                            $whereqj[] = ['end','>=',$two_in_time];
+                            $whereqj[] = ['qj.uid','=',$valz['uid']];
+                            $whereqj[] = ['fl.flow_type','=','qingjia'];
+                            $whereqj[] = ['fl.status','=',2];
+                            $qjinfo = Db::name('qingjia')
+                                    ->alias('qj')
+                                    ->leftJoin('flow_list fl','fl.flow_id = qj.id')
+                                    ->field('qj.*,fl.*')
+                                    ->where($whereqj)
+                                    ->find();
+                            if($qjinfo){
+                                $status_name = qingjia($qjinfo['leixing']);
+                            }
+                            //查询是否国内出差
+                            if(empty($status_name)){
+                                $two_in_date = $val['day'];
+                                $wheregn = [];
+                                $wheregn[] = ['start','<=',$two_in_date];
+                                $wheregn[] = ['end','>=',$two_in_date];
+                                $wheregn[] = ['gn.uid','=',$val['uid']];
+                                $wheregn[] = ['fl.flow_type','=','gnchuchai'];
+                                $wheregn[] = ['fl.status','=',2];
+                                $gninfo = Db::name('gnchuchai')
+                                        ->alias('gn')
+                                        ->leftJoin('flow_list fl','fl.flow_id = gn.id')
+                                        ->field('gn.*,fl.*')
+                                        ->where($wheregn)
+                                        ->find();
+                                if($gninfo){
+                                    $status_name = '国内出差';
+                                }
+                            }
+                            //查询是否国际出差
+                            if(empty($status_name)){
+                                $wheregj = [];
+                                $wheregj[] = ['start','<=',$two_in_date];
+                                $wheregj[] = ['end','>=',$two_in_date];
+                                $wheregj[] = ['gj.uid','=',$val['uid']];
+                                $wheregj[] = ['fl.flow_type','=','gjchuchai'];
+                                $wheregj[] = ['fl.status','=',2];
+                                $gjinfo = Db::name('gjchuchai')
+                                        ->alias('gj')
+                                        ->leftJoin('flow_list fl','fl.flow_id = gj.id')
+                                        ->field('gj.*,fl.*')
+                                        ->where($wheregj)
+                                        ->find();
+                                if($gjinfo){
+                                    $status_name = '国际出差';
+                                }
+                            }
+                        
+                            if(!empty($status_name)){
+                                $checklog = $checklog.$status_name."()";
+                            }else{
+                                $checklog = $checklog."缺卡()";
+                            }
                         }
                         
                         $where4['riqi'] = $valz['day'];;
@@ -1108,7 +1498,66 @@ class Count extends Base
                                 $four = 1;
                             }
                         }else{
-                            $checklog = $checklog."缺卡()";
+                            $status_name = '';
+                            $two_out_time = date('Y-m-d H:i:s',strtotime($valz['day'].$classinfoz['two_out']));
+                            //查询是否请假
+                            $whereqj = [];
+                            $whereqj[] = ['start','<=',$two_out_time];
+                            $whereqj[] = ['end','>=',$two_out_time];
+                            $whereqj[] = ['qj.uid','=',$valz['uid']];
+                            $whereqj[] = ['fl.flow_type','=','qingjia'];
+                            $whereqj[] = ['fl.status','=',2];
+                            $qjinfo = Db::name('qingjia')
+                                    ->alias('qj')
+                                    ->leftJoin('flow_list fl','fl.flow_id = qj.id')
+                                    ->field('qj.*,fl.*')
+                                    ->where($whereqj)
+                                    ->find();
+                            if($qjinfo){
+                                $status_name = qingjia($qjinfo['leixing']);
+                            }
+                            //查询是否国内出差
+                            if(empty($status_name)){
+                                $two_out_date = $val['day'];
+                                $wheregn = [];
+                                $wheregn[] = ['start','<=',$two_out_date];
+                                $wheregn[] = ['end','>=',$two_out_date];
+                                $wheregn[] = ['gn.uid','=',$val['uid']];
+                                $wheregn[] = ['fl.flow_type','=','gnchuchai'];
+                                $wheregn[] = ['fl.status','=',2];
+                                $gninfo = Db::name('gnchuchai')
+                                        ->alias('gn')
+                                        ->leftJoin('flow_list fl','fl.flow_id = gn.id')
+                                        ->field('gn.*,fl.*')
+                                        ->where($wheregn)
+                                        ->find();
+                                if($gninfo){
+                                    $status_name = '国内出差';
+                                }
+                            }
+                            //查询是否国际出差
+                            if(empty($status_name)){
+                                $wheregj = [];
+                                $wheregj[] = ['start','<=',$two_out_date];
+                                $wheregj[] = ['end','>=',$two_out_date];
+                                $wheregj[] = ['gj.uid','=',$val['uid']];
+                                $wheregj[] = ['fl.flow_type','=','gjchuchai'];
+                                $wheregj[] = ['fl.status','=',2];
+                                $gjinfo = Db::name('gjchuchai')
+                                        ->alias('gj')
+                                        ->leftJoin('flow_list fl','fl.flow_id = gj.id')
+                                        ->field('gj.*,fl.*')
+                                        ->where($wheregj)
+                                        ->find();
+                                if($gjinfo){
+                                    $status_name = '国际出差';
+                                }
+                            }   
+                            if(!empty($status_name)){
+                                $checklog = $checklog.$status_name."()";
+                            }else{
+                                $checklog = $checklog."缺卡()";
+                            }
                         }
                         
                         if($three == 1 && $four == 1){
@@ -1169,28 +1618,34 @@ class Count extends Base
         
         $where=[];
         
-        $a = '';
-        if(!empty($keyword)){
-            
-            $whr1=[];
-            $whr1[]=['username|mobile', 'like', '%'.$keyword.'%'];
-            
-            $ids = Db::name('users')
-                ->where($whr1)
-                ->field('id')
-                ->select();
-
-            foreach($ids as $key => $val){
-                $a .= $val['id'].',';
-            }
-            
-        }
-        
         $b = '';
         if(!empty($organizeid)){
             
+            $check_ruless = Db::name('users')->where('id',$this->admin_id)->value('check_ruless');
+            $check_ruless = explode(',',$check_ruless);
+            if(in_array($organizeid,$check_ruless)){
+                $whr2=[];
+                $whr2[] = ['catid', '=', $organizeid];
+    
+                $uids = Db::name('cateuser')
+                    ->where($whr2)
+                    ->field('uid')
+                    ->select();
+    
+                foreach($uids as $key => $val){
+                    $b .= $val['uid'].',';
+                }
+            }else{
+                echo apireturn(200,'无数据','');die;
+            }
+            
+        }else{
+        
+            $check_ruless = Db::name('users')->where('id',$this->admin_id)->value('check_ruless');
+            
             $whr2=[];
-            $whr2[]=['catid', '=', $organizeid];
+            $whr2[]=['catid', 'in', $check_ruless];
+            $whr2[]=['leixing', '=', 1];
 
             $uids = Db::name('cateuser')
                 ->where($whr2)
@@ -1200,6 +1655,31 @@ class Count extends Base
             foreach($uids as $key => $val){
                 $b .= $val['uid'].',';
             }
+            
+        }
+        
+        $b = trim($b,',');
+        
+        $a = '';
+        if(!empty($keyword)){
+            
+            $whr1=[];
+            $whr1[]=['username|mobile', 'like', '%'.$keyword.'%'];
+            $whr1[]=['id', 'in', $b];
+            
+            $ids = Db::name('users')
+                ->where($whr1)
+                ->field('id')
+                ->select();
+
+            foreach($ids as $key => $val){
+                $a .= $val['id'].',';
+            }
+            $where[] = ['uid','in',$a];	
+        }else{
+            
+            $where[] = ['uid','in',$b];	
+           
         }
         
         
@@ -1230,13 +1710,7 @@ class Count extends Base
 
         $aa = $pageSize*($page-1);
         
-        //查询选中的人
-        if(empty($a.$b)){
-            $where[] = ['uid','>',0];
-        }else{
-            $where[] = ['uid','in',$a.$b];			
-        }
-        
+    
         if(!empty($one)){
             $lists = Db::name('check_log')
                     ->where($one)
@@ -1384,22 +1858,22 @@ class Count extends Base
         $whr = [];
         
         if(!empty($data['keyword'])){
-            
+            //$whr[]=['u.username|u.mobile|fl.unionid|u2.username|u2.mobile', 'like', '%'.$data['keyword'].'%'];
             if($data['type'] == 1){
                 $whr[]=['u.username', 'like', '%'.$data['keyword'].'%'];
             }else if($data['type'] == 2){
                 $whr[]=['u.mobile', 'like', '%'.$data['keyword'].'%'];
             }else if($data['type'] == 3){
-                $whr[]=['fa.unionid', 'like', '%'.$data['keyword'].'%'];
+                $whr[]=['fl.unionid', 'like', '%'.$data['keyword'].'%'];
+            }else if($data['type'] == 4){
+                $whr[]=['u2.username', 'like', '%'.$data['keyword'].'%'];
+            }else if($data['type'] == 5){
+                $whr[]=['u2.mobile', 'like', '%'.$data['keyword'].'%'];
             }
-        
         }
         
         if(!empty($data['flow_type'])){
             $whr[] = ['fl.flow_type','=',$data['flow_type']];
-        }
-        if(!empty($data['flow_leixing'])){
-            $whr[] = ['fa.flow_leixing','=',$data['flow_leixing']];
         }
         if(!empty($data['status'])){
             $whr[] = ['fl.status','=',$data['status']];
@@ -1427,22 +1901,31 @@ class Count extends Base
         $pageSize = Request::param('page_size') ? Request::param('page_size') : config('page_size');
         $page = Request::param('page') ? Request::param('page') : 1;
 
-        $a = $page-1;
-        $b = $a * $pageSize;
+        $a = $pageSize*($page-1);
         
-        $list = Db::name('flow_list')
-            ->distinct(true)
+        $lists = Db::name('flow_list')
             ->alias('fl')
             ->leftJoin('users u','fl.shenqing_uid = u.id')
             ->leftJoin('users u2','fl.uid = u2.id')
-            ->rightJoin('flow_apply fa','fl.parentid = fa.unionid')
-            ->field('fl.*,fl.flow_type as flow_type,fl.flow_id as flow_id,u.mobile,u.username,fl.parentid,u2.username as tj_username')
+            ->field('fl.*,fl.flow_type as flow_type,fl.flow_id as flow_id,u.mobile,u.username,fl.parentid,u2.username as tj_username,u2.mobile as tj_mobile')
             ->order('fl.id DESC')
             ->where($whr)
             ->select();
+        $list = Db::name('flow_list')
+            ->alias('fl')
+            ->leftJoin('users u','fl.shenqing_uid = u.id')
+            ->leftJoin('users u2','fl.uid = u2.id')
+            ->field('fl.*,fl.flow_type as flow_type,fl.flow_id as flow_id,u.mobile,u.username,fl.parentid,u2.username as tj_username,u2.mobile as tj_mobile')
+            ->order('fl.id DESC')
+            ->limit($a.','.$pageSize)
+            ->where($whr)
+            ->select();
         
+      
         foreach($list as $key => $val){
+            
             if($val['flow_type']){
+                    
                 $infos = Db::name($val['flow_type'])->where('id',$val['flow_id'])->find();
                 $username = Db::name('users')->where('id',$infos['uid'])->value('username');
                 $list[$key]['username'] = $username;
@@ -1468,7 +1951,9 @@ class Count extends Base
                 $list[$key]['apply_text'] = $apply_text;
                 
                 if($val['flow_type'] == 'buka'){
+                    
                     $info = Db::name($val['flow_type'])->where('id',$val['flow_id'])->find();
+                    
                     $info['user_name'] = Db::name('users')->where('id',$info['uid'])->value('username');
                     $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
                     
@@ -1488,13 +1973,12 @@ class Count extends Base
                     }
                     $list[$key]['info'] = $info;
                     
-                    
-                    $whrz['unionid'] = $val['unionid'];
+                    $whrz['unionid'] = $val['parentid'];
                     //$whrz['uid'] = $this->user_id;
                     $applist = Db::name('flow_apply')->field('sort,flow_way,flow_leixing')->where($whrz)->order('sort asc')->group('sort')->select();
                     foreach($applist as $keys => $vals){
                         $whrzz['sort'] = $vals['sort'];
-                        $whrzz['unionid'] = $val['unionid'];
+                        $whrzz['unionid'] = $val['parentid'];
                         
                         $fa = Db::name('flow_apply')->alias('fa')->leftJoin('users u','fa.apply_uid = u.id')->field('u.username as username,fa.status,fa.is_send,fa.remark,fa.app_time as apptime')->where($whrzz)->order('sort asc')->select();
                         
@@ -1534,12 +2018,12 @@ class Count extends Base
                     }
                     $list[$key]['info'] = $info;
                     
-                    $whrz['unionid'] = $val['unionid'];
+                    $whrz['unionid'] = $val['parentid'];
                     //$whrz['uid'] = $this->user_id;
                     $applist = Db::name('flow_apply')->field('sort,flow_way,flow_leixing')->where($whrz)->order('sort asc')->group('sort')->select();
                     foreach($applist as $keys => $vals){
                         $whrzz['sort'] = $vals['sort'];
-                        $whrzz['unionid'] = $val['unionid'];
+                        $whrzz['unionid'] = $val['parentid'];
                         
                         $fa = Db::name('flow_apply')->alias('fa')->leftJoin('users u','fa.apply_uid = u.id')->field('u.username as username,fa.status,fa.is_send,fa.remark,fa.app_time as apptime')->where($whrzz)->order('sort asc')->select();
                         
@@ -1565,12 +2049,12 @@ class Count extends Base
                     
                     $list[$key]['info'] = $info;
                     
-                    $whrz['unionid'] = $val['unionid'];
+                    $whrz['unionid'] = $val['parentid'];
                     //$whrz['uid'] = $this->user_id;
                     $applist = Db::name('flow_apply')->field('sort,flow_way,flow_leixing')->where($whrz)->order('sort asc')->group('sort')->select();
                     foreach($applist as $keys => $vals){
                         $whrzz['sort'] = $vals['sort'];
-                        $whrzz['unionid'] = $val['unionid'];
+                        $whrzz['unionid'] = $val['parentid'];
                         
                         $fa = Db::name('flow_apply')->alias('fa')->leftJoin('users u','fa.apply_uid = u.id')->field('u.username as username,fa.status,fa.is_send,fa.remark,fa.app_time as apptime')->where($whrzz)->order('sort asc')->select();
                         
@@ -1604,12 +2088,12 @@ class Count extends Base
                     }
                     $list[$key]['info'] = $info;
                     
-                    $whrz['unionid'] = $val['unionid'];
+                    $whrz['unionid'] = $val['parentid'];
                     //$whrz['uid'] = $this->user_id;
                     $applist = Db::name('flow_apply')->field('sort,flow_way,flow_leixing')->where($whrz)->order('sort asc')->group('sort')->select();
                     foreach($applist as $keys => $vals){
                         $whrzz['sort'] = $vals['sort'];
-                        $whrzz['unionid'] = $val['unionid'];
+                        $whrzz['unionid'] = $val['parentid'];
                         
                         $fa = Db::name('flow_apply')->alias('fa')->leftJoin('users u','fa.apply_uid = u.id')->field('u.username as username,fa.status,fa.is_send,fa.remark,fa.app_time as apptime')->where($whrzz)->order('sort asc')->select();
                         
@@ -1648,12 +2132,12 @@ class Count extends Base
                     }
                     $list[$key]['info'] = $info;
                     
-                    $whrz['unionid'] = $val['unionid'];
+                    $whrz['unionid'] = $val['parentid'];
                     //$whrz['uid'] = $this->user_id;
                     $applist = Db::name('flow_apply')->field('sort,flow_way,flow_leixing')->where($whrz)->order('sort asc')->group('sort')->select();
                     foreach($applist as $keys => $vals){
                         $whrzz['sort'] = $vals['sort'];
-                        $whrzz['unionid'] = $val['unionid'];
+                        $whrzz['unionid'] = $val['parentid'];
                         
                         $fa = Db::name('flow_apply')->alias('fa')->leftJoin('users u','fa.apply_uid = u.id')->field('u.username as username,fa.status,fa.is_send,fa.remark,fa.app_time as apptime')->where($whrzz)->order('sort asc')->select();
                         
@@ -1692,12 +2176,258 @@ class Count extends Base
                     }
                     $list[$key]['info'] = $info;
                     
-                    $whrz['unionid'] = $val['unionid'];
+                    $whrz['unionid'] = $val['parentid'];
                     //$whrz['uid'] = $this->user_id;
                     $applist = Db::name('flow_apply')->field('sort,flow_way,flow_leixing')->where($whrz)->order('sort asc')->group('sort')->select();
                     foreach($applist as $keys => $vals){
                         $whrzz['sort'] = $vals['sort'];
-                        $whrzz['unionid'] = $val['unionid'];
+                        $whrzz['unionid'] = $val['parentid'];
+                        
+                        $fa = Db::name('flow_apply')->alias('fa')->leftJoin('users u','fa.apply_uid = u.id')->field('u.username as username,fa.status,fa.is_send,fa.remark,fa.app_time as apptime')->where($whrzz)->order('sort asc')->select();
+                        
+                        foreach ($fa as $k => $v){
+                            if(!empty($v['apptime'])){
+                                $fa[$k]['apptime'] = date('Y-m-d H:i',$v['apptime']);
+                            }
+                        }
+                        $applist[$keys]['erji'] = $fa;
+                    }
+                    
+                    $list[$key]['applist'] = $applist;
+                }else if($val['flow_type'] == 'zhoukoutou'){
+                    $info = Db::name($val['flow_type'])->where('id',$val['flow_id'])->find();
+                    $info['user_name'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                    $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                    
+                    $list[$key]['info'] = $info;
+                    
+                    $whrz['unionid'] = $val['parentid'];
+                    //$whrz['uid'] = $this->user_id;
+                    $applist = Db::name('flow_apply')->field('sort,flow_way,flow_leixing')->where($whrz)->order('sort asc')->group('sort')->select();
+                    foreach($applist as $keys => $vals){
+                        $whrzz['sort'] = $vals['sort'];
+                        $whrzz['unionid'] = $val['parentid'];
+                        
+                        $fa = Db::name('flow_apply')->alias('fa')->leftJoin('users u','fa.apply_uid = u.id')->field('u.username as username,fa.status,fa.is_send,fa.remark,fa.app_time as apptime')->where($whrzz)->order('sort asc')->select();
+                        
+                        foreach ($fa as $k => $v){
+                            if(!empty($v['apptime'])){
+                                $fa[$k]['apptime'] = date('Y-m-d H:i',$v['apptime']);
+                            }
+                        }
+                        $applist[$keys]['erji'] = $fa;
+                    }
+                    
+                    $list[$key]['applist'] = $applist;
+                }else if($val['flow_type'] == 'lizhi'){
+                    $info = Db::name($val['flow_type'])->where('id',$val['flow_id'])->find();
+                    $info['user_name'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                    $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                    if(!empty($info['image'])){
+                        $photo_list = Db::name('flow_image')->where('id','in',$info['image'])->select();
+                        foreach ($photo_list as $keys => $vals){
+                            $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                            $photo_list[$keys]['url'] = $http_type.$_SERVER['HTTP_HOST'].$vals['url'];
+                        }
+                        $info['image_list'] = $photo_list;
+                    }
+                    $list[$key]['info'] = $info;
+                    
+                    $whrz['unionid'] = $val['parentid'];
+                    //$whrz['uid'] = $this->user_id;
+                    $applist = Db::name('flow_apply')->field('sort,flow_way,flow_leixing')->where($whrz)->order('sort asc')->group('sort')->select();
+                    foreach($applist as $keys => $vals){
+                        $whrzz['sort'] = $vals['sort'];
+                        $whrzz['unionid'] = $val['parentid'];
+                        
+                        $fa = Db::name('flow_apply')->alias('fa')->leftJoin('users u','fa.apply_uid = u.id')->field('u.username as username,fa.status,fa.is_send,fa.remark,fa.app_time as apptime')->where($whrzz)->order('sort asc')->select();
+                        
+                        foreach ($fa as $k => $v){
+                            if(!empty($v['apptime'])){
+                                $fa[$k]['apptime'] = date('Y-m-d H:i',$v['apptime']);
+                            }
+                        }
+                        $applist[$keys]['erji'] = $fa;
+                    }
+                    
+                    $list[$key]['applist'] = $applist;
+                }else if($val['flow_type'] == 'canhui'){
+                    $info = Db::name($val['flow_type'])->where('id',$val['flow_id'])->find();
+                    $info['user_name'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                    $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                    if(!empty($info['image'])){
+                        $photo_list = Db::name('flow_image')->where('id','in',$info['image'])->select();
+                        foreach ($photo_list as $keys => $vals){
+                            $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                            $photo_list[$keys]['url'] = $http_type.$_SERVER['HTTP_HOST'].$vals['url'];
+                        }
+                        $info['image_list'] = $photo_list;
+                    }
+                    $list[$key]['info'] = $info;
+                    
+                    $whrz['unionid'] = $val['parentid'];
+                    //$whrz['uid'] = $this->user_id;
+                    $applist = Db::name('flow_apply')->field('sort,flow_way,flow_leixing')->where($whrz)->order('sort asc')->group('sort')->select();
+                    foreach($applist as $keys => $vals){
+                        $whrzz['sort'] = $vals['sort'];
+                        $whrzz['unionid'] = $val['parentid'];
+                        
+                        $fa = Db::name('flow_apply')->alias('fa')->leftJoin('users u','fa.apply_uid = u.id')->field('u.username as username,fa.status,fa.is_send,fa.remark,fa.app_time as apptime')->where($whrzz)->order('sort asc')->select();
+                        
+                        foreach ($fa as $k => $v){
+                            if(!empty($v['apptime'])){
+                                $fa[$k]['apptime'] = date('Y-m-d H:i',$v['apptime']);
+                            }
+                        }
+                        $applist[$keys]['erji'] = $fa;
+                    }
+                    
+                    $list[$key]['applist'] = $applist;
+                }else if($val['flow_type'] == 'zhuangang'){
+                    $info = Db::name($val['flow_type'])->where('id',$val['flow_id'])->find();
+                    $info['user_name'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                    $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                    $info['to_group_name'] = Db::name('cate')->where('id',$info['to_group_id'])->value('title');
+                    $list[$key]['info'] = $info;
+                    
+                    $whrz['unionid'] = $val['parentid'];
+                    //$whrz['uid'] = $this->user_id;
+                    $applist = Db::name('flow_apply')->field('sort,flow_way,flow_leixing')->where($whrz)->order('sort asc')->group('sort')->select();
+                    foreach($applist as $keys => $vals){
+                        $whrzz['sort'] = $vals['sort'];
+                        $whrzz['unionid'] = $val['parentid'];
+                        
+                        $fa = Db::name('flow_apply')->alias('fa')->leftJoin('users u','fa.apply_uid = u.id')->field('u.username as username,fa.status,fa.is_send,fa.remark,fa.app_time as apptime')->where($whrzz)->order('sort asc')->select();
+                        
+                        foreach ($fa as $k => $v){
+                            if(!empty($v['apptime'])){
+                                $fa[$k]['apptime'] = date('Y-m-d H:i',$v['apptime']);
+                            }
+                        }
+                        $applist[$keys]['erji'] = $fa;
+                    }
+                    
+                    $list[$key]['applist'] = $applist;
+                }else if($val['flow_type'] == 'ruzhi'){
+                    $info = Db::name($val['flow_type'])->where('id',$val['flow_id'])->find();
+                    $info['user_name'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                    $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                    $info['attendance_group_name'] = Db::name('attendance_group')->where('id',$info['attendance_group_id'])->value('title');
+                    $list[$key]['info'] = $info;
+                    
+                    $whrz['unionid'] = $val['parentid'];
+                    //$whrz['uid'] = $this->user_id;
+                    $applist = Db::name('flow_apply')->field('sort,flow_way,flow_leixing')->where($whrz)->order('sort asc')->group('sort')->select();
+                    foreach($applist as $keys => $vals){
+                        $whrzz['sort'] = $vals['sort'];
+                        $whrzz['unionid'] = $val['parentid'];
+                        
+                        $fa = Db::name('flow_apply')->alias('fa')->leftJoin('users u','fa.apply_uid = u.id')->field('u.username as username,fa.status,fa.is_send,fa.remark,fa.app_time as apptime')->where($whrzz)->order('sort asc')->select();
+                        
+                        foreach ($fa as $k => $v){
+                            if(!empty($v['apptime'])){
+                                $fa[$k]['apptime'] = date('Y-m-d H:i',$v['apptime']);
+                            }
+                        }
+                        $applist[$keys]['erji'] = $fa;
+                    }
+                    
+                    $list[$key]['applist'] = $applist;
+                }else if($val['flow_type'] == 'sbsqd'){
+                    $info = Db::name($val['flow_type'])->where('id',$val['flow_id'])->find();
+                    $info['user_name'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                    $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                    $list[$key]['info'] = $info;
+                    
+                    $whrz['unionid'] = $val['parentid'];
+                    //$whrz['uid'] = $this->user_id;
+                    $applist = Db::name('flow_apply')->field('sort,flow_way,flow_leixing')->where($whrz)->order('sort asc')->group('sort')->select();
+                    foreach($applist as $keys => $vals){
+                        $whrzz['sort'] = $vals['sort'];
+                        $whrzz['unionid'] = $val['parentid'];
+                        
+                        $fa = Db::name('flow_apply')->alias('fa')->leftJoin('users u','fa.apply_uid = u.id')->field('u.username as username,fa.status,fa.is_send,fa.remark,fa.app_time as apptime')->where($whrzz)->order('sort asc')->select();
+                        
+                        foreach ($fa as $k => $v){
+                            if(!empty($v['apptime'])){
+                                $fa[$k]['apptime'] = date('Y-m-d H:i',$v['apptime']);
+                            }
+                        }
+                        $applist[$keys]['erji'] = $fa;
+                    }
+                    
+                    $list[$key]['applist'] = $applist;
+                }else if($val['flow_type'] == 'zhuanzhengjinji'){
+                    $info = Db::name($val['flow_type'])->where('id',$val['flow_id'])->find();
+                    $info['user_name'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                    $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                    if(!empty($info['image'])){
+                        $photo_list = Db::name('flow_image')->where('id','in',$info['image'])->select();
+                        foreach ($photo_list as $keys => $vals){
+                            $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                            $photo_list[$keys]['url'] = $http_type.$_SERVER['HTTP_HOST'].$vals['url'];
+                        }
+                        $info['image_list'] = $photo_list;
+                    }
+                    if(!empty($info['qingdan'])){
+                        $qingdan_list = Db::name('flow_image')->where('id','in',$info['qingdan'])->select();
+                        foreach ($qingdan_list as $keys => $vals){
+                            $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                            $qingdan_list[$keys]['url'] = $http_type.$_SERVER['HTTP_HOST'].$vals['url'];
+                        }
+                        $info['qingdan_list'] = $qingdan_list;
+                    }
+                    $list[$key]['info'] = $info;
+                    
+                    $whrz['unionid'] = $val['parentid'];
+                    //$whrz['uid'] = $this->user_id;
+                    $applist = Db::name('flow_apply')->field('sort,flow_way,flow_leixing')->where($whrz)->order('sort asc')->group('sort')->select();
+                    foreach($applist as $keys => $vals){
+                        $whrzz['sort'] = $vals['sort'];
+                        $whrzz['unionid'] = $val['parentid'];
+                        
+                        $fa = Db::name('flow_apply')->alias('fa')->leftJoin('users u','fa.apply_uid = u.id')->field('u.username as username,fa.status,fa.is_send,fa.remark,fa.app_time as apptime')->where($whrzz)->order('sort asc')->select();
+                        
+                        foreach ($fa as $k => $v){
+                            if(!empty($v['apptime'])){
+                                $fa[$k]['apptime'] = date('Y-m-d H:i',$v['apptime']);
+                            }
+                        }
+                        $applist[$keys]['erji'] = $fa;
+                    }
+                    
+                    $list[$key]['applist'] = $applist;
+                }else if($val['flow_type'] == 'nianjia'){
+                    $info = Db::name($val['flow_type'])->where('id',$val['flow_id'])->find();
+                    $info['user_name'] = Db::name('users')->where('id',$info['uid'])->value('username');
+                    $info['group_name'] = Db::name('cate')->where('id',$info['group_id'])->value('title');
+                    if(!empty($info['image'])){
+                        $photo_list = Db::name('flow_image')->where('id','in',$info['image'])->select();
+                        foreach ($photo_list as $keys => $vals){
+                            $http_type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+                            $photo_list[$keys]['url'] = $http_type.$_SERVER['HTTP_HOST'].$vals['url'];
+                        }
+                        $info['image_list'] = $photo_list;
+                    }
+                    if($info['start_type'] == 1){
+                        $info['start_name'] = '上午';
+                    }else{
+                        $info['start_name'] = '下午';
+                    }
+                    if($info['end_type'] == 1){
+                        $info['end_name'] = '上午';
+                    }else{
+                        $info['end_name'] = '下午';
+                    }
+                    
+                    $list[$key]['info'] = $info;
+                    
+                    $whrz['unionid'] = $val['parentid'];
+                    //$whrz['uid'] = $this->user_id;
+                    $applist = Db::name('flow_apply')->field('sort,flow_way,flow_leixing')->where($whrz)->order('sort asc')->group('sort')->select();
+                    foreach($applist as $keys => $vals){
+                        $whrzz['sort'] = $vals['sort'];
+                        $whrzz['unionid'] = $val['parentid'];
                         
                         $fa = Db::name('flow_apply')->alias('fa')->leftJoin('users u','fa.apply_uid = u.id')->field('u.username as username,fa.status,fa.is_send,fa.remark,fa.app_time as apptime')->where($whrzz)->order('sort asc')->select();
                         
@@ -1712,13 +2442,10 @@ class Count extends Base
                     $list[$key]['applist'] = $applist;
                 }
             }
-            
         }
         
-       
         
-        $data_rt['total'] = count($list);
-        $list = array_slice($list,$b,$pageSize);
+        $data_rt['total'] = count($lists);
         $data_rt['data'] = $list;
         
         echo apireturn(200,'success',$data_rt);die;
